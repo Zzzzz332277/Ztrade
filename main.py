@@ -1,12 +1,14 @@
 
 import datetime
+
+import pandas as pd
 from WindPy import *
 #import matplotlib.pyplot as plt
 #import matplotlib.ticker as ticker
 import database
 import basic
 import recognition
-
+import stockclass
 from talib import EMA
 
 ################################################################################################
@@ -25,18 +27,46 @@ if __name__ == '__main__':
     # ax = fig.add_subplot(111)
     # 获取data
     # 遍历获取
-    codelist = ['1024.HK', '3690.HK', '0700.HK', '0001.HK']
+    #codelist = ['1024.HK', '3690.HK', '0700.HK', '0001.HK']
+    codelist = ['1024.HK']
+
     startDate = date(2023,5,15)
-    endDate = date(2023,6,1)
-    gwd.UpdateTimePeriodData(codelist,startDate,endDate,'ExpMA')
-    #gwd.UpdateDataToNewest(codelist,'DayPriceData')
+    endDate = date(2023,7,15)
+
+    complexData = gwd.GetTimePeriodData(codelist,startDate,endDate)
+    complexDataEMA =gwd.GetTimePeriodDataEMA(codelist,startDate,endDate)
+    #声明一个stock类的数组
+    stocklist = [stockclass.StockClass for i in range(len(codelist))]
+    stocklistIndex = 0
+    buffEMA = pd.DataFrame()
+    for code in codelist:
+        buffdata = complexData[complexData['CODE']==code]
+
+        periods =  gwd.emaPeriod #获取到设定好的ema值
+        for period in periods:
+            buffdataEMA = complexDataEMA[(complexDataEMA['CODE'] == code) & (complexDataEMA['PERIOD'] == period)]
+            #对EMA数据的格式进行操作
+            buffEMA['DATE'] = buffdataEMA['DATE']
+            buffEMA[f'EMA{period}'] = buffdataEMA['EXPMA']
+
+
+        #这里对buffdata要进行排序
+        pass
+        stocklist[stocklistIndex] = stockclass.StockClass(code,buffdata,buffEMA)
+        stocklistIndex = stocklistIndex+1
+    pass
+
+    #识别的类
+    recog=recognition.Recognition()
+    recog.RecognitionProcess(stocklist)
+    pass
    # stockdata = w.wsd("0700.HK","open,low,close,volume,amt,pct_chg,turn,mfd_buyamt_a,mfd_sellamt_a,mfd_buyvol_a,mfd_sellvol_a,mfd_netbuyamt,mfd_netbuyvol,mfd_buyamt_d,mfd_sellamt_d,mfn_sn_inflowdays,mfn_sn_outflowdays,mfd_sn_buyamt,mfd_sn_sellamt","2015-01-01", "2023-04-26", "unit=1;traderType=1;TradingCalendar=HKEX;PriceAdj=F")
     # 这一步将数据格式进行转置
     # data=pd.DataFrame(stockdata.Data,index=stockdata.Fields)
     # 引入时间
     #dpr=database.DataPreparation()
     #outdate=dpr.GetDataBase(codelist,startDate,endDate)
-    pass
+
     # data=data.T #转置
     # data['TIMES']=stockdata.Times
 

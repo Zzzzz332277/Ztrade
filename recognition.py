@@ -1,30 +1,29 @@
+import numpy as np
 from scipy import interpolate
 from scipy.misc import derivative
-import pandas as pd
-import numpy as np
-import datetime
-import stock
+
+import stockclass
+
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
     def __init__(self):
         pass
 
-    def RecognitionProcess(self,stockdict):
-        for key in stockdict:
-            stockInProcess = stockdict[key] #去除对象值
-            #取出stocklist后，开始进行识别的操作链
+    def RecognitionProcess(self,stocklist):
+        for stock in stocklist:
+            stockInProcess = stock#取出对象值
+            #取出stocklist后，开始进行识别的操作链'
             diffusionRestul = self.EmaDiffusion(stockInProcess)
-
             #判断回踩
             backStepResult = self.BackStepEma(stockInProcess)
 
     def EmaDiffusion(self, stock):
         # 根据上下关系判断，均线的顺序也是从上到下降低,5条均线
-        if self.RelativeRelationofTwoLine(stock.EMA['ema5'], stock.EMA['ema10']) == '1up2':
-            if self.RelativeRelationofTwoLine(stock.EMA['ema10'], stock.EMA['ema20']) == '1up2':
-                if self.RelativeRelationofTwoLine(stock.EMA['ema20'], stock.EMA['ema30']) == '1up2':
-                    if self.RelativeRelationofTwoLine(stock.EMA['ema30'], stock.EMA['ema60']) == '1up2':
+        if self.RelativeRelationofTwoLine(stock.EMAData['EMA5'], stock.EMAData['EMA10']) == '1up2':
+            if self.RelativeRelationofTwoLine(stock.EMAData['EMA10'], stock.EMAData['EMA20']) == '1up2':
+                if self.RelativeRelationofTwoLine(stock.EMAData['EMA20'], stock.EMAData['EMA30']) == '1up2':
+                    if self.RelativeRelationofTwoLine(stock.EMAData['EMA30'], stock.EMAData['EMA60']) == '1up2':
                         return 'diffusion'
 
         else:
@@ -32,13 +31,10 @@ class Recognition:
 
     # 对组件进行逻辑定义，类下有没有更小的类
     def RelativeRelationofTwoLine(self, line1, line2):
-        if line1 == line2:
-            print('参数错误，是同一条线')
+
+        if len(line1) != len(line2):
+            print('参数错误，长度不相等')
             return 0
-        else:
-            if len(line1) != len(line2):
-                print('参数错误，长度不相等')
-                return 0
         # 判断是否相交,以及线段上下关系
         lineResult = line1 - line2
         k = 0
@@ -65,8 +61,8 @@ class Recognition:
         # derivative of y with respect to x,用derivative函数求导
         # df_dx = derivative(f, x_fake, dx=1e-6)
         # 实际上返回的是线段
-        line = stock.EMA['ema20']
-        TIME = stock.StockDataFrame['time']
+        line = stock.EMAData['EMA20']
+        TIME = stock.dayPriceData['DATE']
         line.transpose()
         x = np.arange(1, len(line) + 1, 1)
 
@@ -128,28 +124,28 @@ class Recognition:
             else:
                 direction = 'down'
 
-            dataset.append(stock.Trend(TIME[index1], TIME[index2], TIME[index2] - TIME[index1], direction))
-
+            dataset.append(stockclass.Trend(TIME[index1], TIME[index2], TIME[index2] - TIME[index1], direction))
+            stock.trendList=dataset
         pass
         return dataset
 
     # 均线回踩
     def BackStepEma(self, stock):
-        trend = self.RecognizeTrend(stock)  # 这里需要改一下，获取到一个trend类的数组
+        trendlist = self.RecognizeTrend(stock)  # 这里需要改一下，获取到一个trend类的数组
         # 当60日均线的趋势是向上的，而且在趋势中时
-        lastTrend = trend[-1]
+        lastTrend = trendlist[-1]
         if lastTrend.Direction == 'up':
             # if kline[close].today/ema20.today<1.1 根据一个比例来进行判断 当天的价格
-            databuff = stock.dayPriceData['close']
+            databuff = stock.dayPriceData['CLOSE']
             closePirce = databuff[-1]  # 取最后一个
             if databuff[-2] < databuff[-1]:
                 print('不符合回踩标准')
                 return "不是回踩"
             else:
                 distance = []
-                distance[0] = abs(closePirce - stock.EMAData['ema5'].iloc[-1])
-                distance[1] = abs(closePirce - stock.EMAData['ema10'].iloc[-1])
-                distance[2] = abs(closePirce - stock.EMAData['ema20'].iloc[-1])
+                distance[0] = abs(closePirce - stock.EMAData['EMA5'].iloc[-1])
+                distance[1] = abs(closePirce - stock.EMAData['EMA10'].iloc[-1])
+                distance[2] = abs(closePirce - stock.EMAData['EMA20'].iloc[-1])
                 pos = distance.index(min(distance))
                 if pos == 0:
                     pass

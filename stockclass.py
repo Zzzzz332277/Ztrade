@@ -2,29 +2,36 @@ import talib
 import pandas as pd
 import numpy as np
 
+#趋势类
+class Trend:
+    def __init__(self, start, end, len, direction):
+        self.StartTime = start
+        self.EndTime = end
+        self.Length = len
+        self.Direction = direction
+
 # 适用于wind数据的candle
 class StockClass:
     code = ''
     dayPriceData = pd.DataFrame()
     EMAData = pd.DataFrame()
+    trendList= []
 
     #def __init__(self, code,dayPriceDataFrame,emaDataFrame):  # 从数据库中取出的是一个dataframe
-    def __init__(self, code, dayPriceDataFrame):  # 从数据库中取出的是一个dataframe
+    #不接受输入的初始化函数
+    def __init__(self):
+        pass
 
+    def __init__(self, code, dayPriceDataFrame,emaData):  # 从数据库中取出的是一个dataframe
         self.code = code
+        self.trendList = [Trend]
+        self.EMAData1 = emaData
         # 直接在这里完成stock的转置和处理
-        '''
-        data = pd.DataFrame(stockdata.Data, index=stockdata.Fields)
-        data = data.T  # 转置
-        data['time'] = stockdata.Times
-
-        self.StockDataFrame = data
-        '''
         self.dayPriceData = dayPriceDataFrame
-        #EMAData = emaDataFrame
+        self.EMAData = emaData
         #############################获取时间########################
-        startdate = self.dayPriceData['Date'].iloc[0]
-        enddate = self.dayPriceData['Date'].iloc[-1]
+        startdate = self.dayPriceData['DATE'].iloc[0]
+        enddate = self.dayPriceData['DATE'].iloc[-1]
 
         '''
         暂时先不用ema跑流程
@@ -41,12 +48,8 @@ class StockClass:
         EMA['ema20'] = talib.SMA(self.StockData['CLOSE'], timeperiod=20)
         EMA['ema30'] = talib.SMA(self.StockData['CLOSE'], timeperiod=30)
 
+
+
     '''
 
 
-class Trend:
-    def __init__(self, start, end, len, direction):
-        self.StartTime = start
-        self.EndTime = end
-        self.Length = len
-        self.Direction = direction
