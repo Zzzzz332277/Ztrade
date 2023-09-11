@@ -1,7 +1,6 @@
 import datetime
 from WindPy import *
 import sqlalchemy
-import sqlalchemy
 #from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
 import pymysql
@@ -99,6 +98,12 @@ class ExpMA(Base):
     EXPMA= Column(Float)
     PERIOD= Column(Integer)
 
+class CodeDateIndex(Base):
+    __tablename__ = 'CodeDateIndex'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+    STARTDATE= Column(Date)
+    ENDDATE= Column(Date)
 
 ####################################创建表格###############################################################
 Base.metadata.create_all(engine)
@@ -163,16 +168,15 @@ class GetWindDaTA:
         for code in codelist:
             buffData = w.wsd(code,tableKeyWordForWind[tableName],statrTimeStr, endTimeStr, "unit=1;traderType=1;TradingCalendar=HKEX;PriceAdj=F")
             print(f"获取{code}的日线数据")
-            # 这里取出的是没有时间的。
             data = pd.DataFrame(buffData.Data, index=buffData.Fields)
             data = data.T
             data['DATE'] = buffData.Times
             data['CODE'] = code
-            #Id = np.linspace(1,len(data),len(data))
-            #data['ID'] = Id
             data.to_sql(name=tableName, con=engine, schema='ztrade',if_exists="append",index=False)
 
 
+
+    #获取EMA数据并写入数据库
     def UpdateTimePeriodDataEMA(self, codelist, startDate, endDate,tableName):
         # 合并字符串
         windinputstr = ','.join(codelist)
@@ -324,10 +328,7 @@ class GetWindDaTA:
                     # 全部一次性写入
         print("开始写入数据库")
         concatDataframe.to_sql(name=tableName, con=engine, schema='ztrade', if_exists="append", index=False)
-#准备数据的类
-class DataPreparation:
-    def __init__(self):
-        pass
+
 
     #将数据库的数据查询出来存储在一个dataframe里，以供后续进行筛选，处理。需要细化传入的是date类型还是字符串
     def GetDataBase(self, codeList, startdate, enddate):
@@ -362,3 +363,85 @@ class DataPreparation:
         pass
         #return outData
 
+    def SyncDateBase(self, codeList, startdate, enddate,tablename):
+        oneDay=timedelta(days=1)
+        #需要将单个的code转化为codelist，满足update函数的运行条件
+        for code in codeList:
+            codeListBuff = []
+            codeListBuff.append(code)
+            codeResult = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).all()
+            if len(codeResult) == 0:
+                print(f'表中无该{code}数据,开始获取新数据')
+                self.UpdateTimePeriodData(codelist=codeListBuff, startDate=startdate, endDate=enddate, tableName='daypricedata')
+                self.UpdateTimePeriodDataEMA(codelist=codeListBuff, startDate=startdate, endDate=enddate, tableName='expma')
+                self.UpdateCodeIndex(code,startdate, enddate)
+                continue
+                # 还有一种情况是需要获取的数据范围包裹住了数据库内的数据范围
+            if startdate < dbStartDate and enddate > dbEndDate:
+                print('前后方数据都需要补充')
+                # 补充前方数据
+                startdatebuff = startdate
+                endDatebuff = dbStartDate - oneDay
+                self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+                self.UpdateTimePeriodDataEMA(codeListBuff, startdatebuff, endDatebuff, tableName='expma')
+                # 补充后方数据
+                startdatebuff = dbEndDate + oneDay
+                endDatebuff = enddate
+                self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+                self.UpdateTimePeriodDataEMA(codeListBuff, startdatebuff, endDatebuff, tableName='expma')
+
+                # 这里边界以startdate和enddate为准
+                self.UpdateCodeIndex(code, startdate, enddate)
+                continue
+            #code在表中存在的情况下，在表中获取startdate和enddate
+            index = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).first()
+            dbStartDate = index.STARTDATE
+            dbEndDate = index.ENDDATE
+
+            if startdate>=dbEndDate or enddate<=dbStartDate:
+                #说明数据库中的时间范围和目标时间范围不重叠，中间的空隙需要补上，否则整个逻辑会失效
+                if startdate>=dbEndDate:
+                    print('数据在后方有空隙，进行填补')
+                    startdatebuff = dbEndDate+oneDay
+                    endDatebuff = enddate
+                    dbStartDateBuff=dbStartDate
+                    dbEndDateBuff=endDatebuff
+                else:
+                    print('数据在前方有空隙，进行填补')
+                    startdatebuff = startdate
+                    endDatebuff = dbStartDate-oneDay
+                    dbStartDateBuff = startdatebuff
+                    dbEndDateBuff = dbEndDate
+            else:
+                if startdate>=dbStartDate and enddate<=dbEndDate:
+                    #说明日期在包裹之内，不用重新获取
+                    print('已有数据，不用获取')
+                else:
+                    if startdate>=dbStartDate and enddate>dbEndDate:
+                        print('补充后方数据')
+                        #说明只需要获取后面一部分的数据
+                        startdatebuff = dbEndDate+oneDay
+                        endDatebuff = enddate
+                        dbStartDateBuff = dbStartDate
+                        dbEndDateBuff = endDatebuff
+                    else:
+                        if startdate<dbStartDate and enddate<=dbEndDate:
+                            print('补充前方数据')
+                            startdatebuff = startdate
+                            endDatebuff=dbStartDate-oneDay
+                            dbStartDateBuff = startdatebuff
+                            dbEndDateBuff = dbEndDate
+            #根据日期情况鞥新数据
+            self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+            self.UpdateTimePeriodDataEMA(codeListBuff, startdatebuff, endDatebuff, tableName='expma')
+            self.UpdateCodeIndex(code, dbStartDateBuff, dbEndDateBuff)
+
+    def UpdateCodeIndex(self,code,startDate,endDate):
+        # 更新codeindex表的数据
+        queryResult = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).all()
+        if len(queryResult) == 0:
+            codeDateIndexbuff = CodeDateIndex(CODE=code, STARTDATE=startDate, ENDDATE=endDate)
+            session.add(codeDateIndexbuff)
+        else:
+            session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).update({"STARTDATE": startDate, "ENDDATE": endDate})
+        session.commit()

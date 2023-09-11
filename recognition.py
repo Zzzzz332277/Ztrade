@@ -1,8 +1,10 @@
 import numpy as np
+import pandas as pd
 from scipy import interpolate
 from scipy.misc import derivative
 
 import stockclass
+from WindPy import *
 
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
@@ -14,24 +16,27 @@ class Recognition:
         for stock in stocklist:
             stockInProcess = stock#取出对象值
             #取出stocklist后，开始进行识别的操作链'
-            diffusionRestul = self.EmaDiffusion(stockInProcess)
+            #diffusionRestul = self.EmaDiffusion(stockInProcess)
             #判断回踩
-            backStepResult = self.BackStepEma(stockInProcess)
-
+            #backStepResult = self.BackStepEma(stockInProcess)
+            catchBottumResult = self.CatchBottom(stockInProcess)
+        pass
     def EmaDiffusion(self, stock):
+        print(f"开始识别均线发散：{stock.code}")
         # 根据上下关系判断，均线的顺序也是从上到下降低,5条均线
         if self.RelativeRelationofTwoLine(stock.EMAData['EMA5'], stock.EMAData['EMA10']) == '1up2':
             if self.RelativeRelationofTwoLine(stock.EMAData['EMA10'], stock.EMAData['EMA20']) == '1up2':
                 if self.RelativeRelationofTwoLine(stock.EMAData['EMA20'], stock.EMAData['EMA30']) == '1up2':
                     if self.RelativeRelationofTwoLine(stock.EMAData['EMA30'], stock.EMAData['EMA60']) == '1up2':
+                        print(f"{stock.code}均线发散")
                         return 'diffusion'
 
         else:
+            print(f"{stock.code}均线不发散")
             return 'undiffusion'
 
     # 对组件进行逻辑定义，类下有没有更小的类
     def RelativeRelationofTwoLine(self, line1, line2):
-
         if len(line1) != len(line2):
             print('参数错误，长度不相等')
             return 0
@@ -89,6 +94,19 @@ class Recognition:
         #        positionArray[i]=1
         positionArray = 100 * df_dx[:-1] * df_dx[1:]
         positionArray[positionArray > 0] = 0
+        dataset = []
+
+        if np.count_nonzero(positionArray)==0:
+        #说明是单边，判断趋势方向并返回
+            if line.iloc[-1]>line.iloc[0]:
+                direction = 'up'
+            else:
+                direction = 'down'
+            dataset.append(stockclass.Trend(TIME.iloc[0], TIME.iloc[-1],  TIME.iloc[-1]-TIME.iloc[0], direction))
+            stock.trendList = dataset
+            #直接返回
+            return dataset
+
         # 将nan值全部赋0
         i = 0
         while i < len(positionArray):
@@ -113,7 +131,7 @@ class Recognition:
 
         # 开始确定趋势的时间，起始时间，结束时间，方向
         # dataset = [Trend for _ in range(100)]
-        dataset = []
+
 
         # trend=Trend(time[1],time[1],time[11]-time[1],'up')
         for i in range(0, len(pos_1d) - 1):
@@ -126,44 +144,76 @@ class Recognition:
 
             dataset.append(stockclass.Trend(TIME[index1], TIME[index2], TIME[index2] - TIME[index1], direction))
             stock.trendList=dataset
-        pass
+
+
         return dataset
 
     # 均线回踩
     def BackStepEma(self, stock):
+        print(f"开始识别均线回踩：{stock.code}")
         trendlist = self.RecognizeTrend(stock)  # 这里需要改一下，获取到一个trend类的数组
         # 当60日均线的趋势是向上的，而且在趋势中时
         lastTrend = trendlist[-1]
         if lastTrend.Direction == 'up':
             # if kline[close].today/ema20.today<1.1 根据一个比例来进行判断 当天的价格
             databuff = stock.dayPriceData['CLOSE']
-            closePirce = databuff[-1]  # 取最后一个
-            if databuff[-2] < databuff[-1]:
+            closePirce = databuff.iloc[-1]  # 取最后一个
+            if databuff.iloc[-2] < databuff.iloc[-1]:
                 print('不符合回踩标准')
                 return "不是回踩"
             else:
-                distance = []
-                distance[0] = abs(closePirce - stock.EMAData['EMA5'].iloc[-1])
-                distance[1] = abs(closePirce - stock.EMAData['EMA10'].iloc[-1])
-                distance[2] = abs(closePirce - stock.EMAData['EMA20'].iloc[-1])
-                pos = distance.index(min(distance))
+                distanceList = []
+                distanceToEma5 = abs(closePirce - stock.EMAData['EMA5'].iloc[-1])
+                distanceToEma10 = abs(closePirce - stock.EMAData['EMA10'].iloc[-1])
+                distanceToEma20 = abs(closePirce - stock.EMAData['EMA20'].iloc[-1])
+                distanceList.append(distanceToEma5)
+                distanceList.append(distanceToEma10)
+                distanceList.append(distanceToEma20)
+
+                pos = distanceList.index(min(distanceList))
                 if pos == 0:
                     pass
-                    # return '回踩5日均线' 回踩5日意义不大
+                    print(f"{stock.code}回踩5日均线")
+                    return '回踩5日均线'
                 else:
                     if pos == 1:
+                        print(f"{stock.code}回踩10日均线")
                         return '回踩10日均线'
                     else:
+                        print(f"{stock.code}回踩20日均线")
                         return '回踩20日均线'
 
         else:
+            print("不是上升趋势")
             return "不是上升趋势"
         # if kline[close].today/ema30.today<1.1 到底踩哪条均线，需要判断
         # 返回回踩的均线的值，返回状态是否均线回踩
 
     # 抄底
     def CatchBottom(self, stock):
-        trend = self.RecognizeTrend(stock)  # 判断下降趋势，
+        print(f'{stock.code}开始通过资金识别底部')
+        trendlist = self.RecognizeTrend(stock)  # 判断下降趋势，
+        lastTrend = trendlist[-1]
+        if lastTrend.Direction == 'down':
+            print('不是下降趋势')
+            return '不是下降趋势'
+        else:
+            cashFlowStartDate = stock.startDate
+            cashFlowEndDate = stock.endDate
+            statrTimeStr = cashFlowStartDate.strftime("%Y%m%d")
+            endTimeStr = cashFlowEndDate.strftime("%Y%m%d")
+            cashFLowBuff = w.wsd(stock.code, "mfd_inflowrate_m", f"{statrTimeStr}", f"{endTimeStr}", "TradingCalendar=HKEX;PriceAdj=F")
+            cashFLow = pd.DataFrame(cashFLowBuff.Data, index=cashFLowBuff.Fields)
+            cashFLow = cashFLow.T
+            cashFLow['TIME'] = cashFLowBuff.Times
+            lastMajorRate = cashFLow['MFD_INFLOWRATE_M'].iloc[-1]
+            if lastMajorRate >50:
+                print('主力资金流入，可能存在抄底机会')
+                return '主力资金流入，可能存在抄底机会'
+            else:
+                print('主力资金流入不足')
+                return '主力资金流入不足'
+
         # 伪代码
         # 当下行趋势中
         # if 资金大量进入

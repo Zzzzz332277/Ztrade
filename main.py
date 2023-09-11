@@ -3,6 +3,8 @@ import datetime
 
 import pandas as pd
 from WindPy import *
+from futu import RET_OK
+
 #import matplotlib.pyplot as plt
 #import matplotlib.ticker as ticker
 import database
@@ -10,36 +12,51 @@ import basic
 import recognition
 import stockclass
 from talib import EMA
-
+import futu as ft
 ################################################################################################
 # 程序开始的地方，后面需要加入__main__的判断
 ################################################################################################
 
 if __name__ == '__main__':
-    # 运行wind
-    #w.start()
-    # gwd=GetWindDaTA()
-    # DATA=gwd.UpdateData()
-    # pass
+    '''
+    #################################与富途api进行连接########################################
+    # 实例化行情上下文对象
+    quote_ctx = ft.OpenQuoteContext(host="127.0.0.1", port=11111)
+    # 上下文控制
+    quote_ctx.start()  # 开启异步数据接收
+    quote_ctx.set_handler(ft.TickerHandlerBase())  # 设置用于异步处理数据的回调对象(可派生支持自定义)
+
+    ret, data = quote_ctx.get_user_security("每日关注")
+    if ret == RET_OK:
+        print(data)
+        if data.shape[0] > 0:  # 如果自选股列表不为空
+            print(data['code'][0])  # 取第一条的股票代码
+            print(data['code'].values.tolist())  # 转为 list
+    els e:
+        print('error:', data)
+    quote_ctx.close()  # 结束后记得关闭当条连接，防止连接条数用尽
+    #######################################################################################
+    ###'''
     gwd= database.GetWindDaTA()
+
     #Base.metadata.create_all(engine)
+    codelist = ['0700.HK','3690.HK']
+    startDate = date(2022,9,10)
+    endDate = date(2022,9,30)
+    gwd.SyncDateBase(codelist,startDate,endDate,'codedateindex')
+    #gwd.UpdateTimePeriodData(codelist,startDate,endDate,'daypricedata')
+    #gwd.UpdateTimePeriodDataEMA(codelist,startDate,endDate,'ExpMA')
 
-    # ax = fig.add_subplot(111)
-    # 获取data
-    # 遍历获取
-    #codelist = ['1024.HK', '3690.HK', '0700.HK', '0001.HK']
-    codelist = ['1024.HK']
-
-    startDate = date(2023,5,15)
-    endDate = date(2023,7,15)
-
+    #################################测试将数据存进去数据库###########################
     complexData = gwd.GetTimePeriodData(codelist,startDate,endDate)
     complexDataEMA =gwd.GetTimePeriodDataEMA(codelist,startDate,endDate)
     #声明一个stock类的数组
     stocklist = [stockclass.StockClass for i in range(len(codelist))]
     stocklistIndex = 0
-    buffEMA = pd.DataFrame()
     for code in codelist:
+        buffdata =  pd.DataFrame() #重新声明，避免浅拷贝
+        buffEMA = pd.DataFrame()
+        buffdataEMA = pd.DataFrame()
         buffdata = complexData[complexData['CODE']==code]
 
         periods =  gwd.emaPeriod #获取到设定好的ema值
@@ -49,17 +66,16 @@ if __name__ == '__main__':
             buffEMA['DATE'] = buffdataEMA['DATE']
             buffEMA[f'EMA{period}'] = buffdataEMA['EXPMA']
 
-
         #这里对buffdata要进行排序
         pass
-        stocklist[stocklistIndex] = stockclass.StockClass(code,buffdata,buffEMA)
+        stockClassBuff = stockclass.StockClass(code,buffdata,buffEMA)
+        stocklist[stocklistIndex] = stockClassBuff
         stocklistIndex = stocklistIndex+1
     pass
 
     #识别的类
     recog=recognition.Recognition()
     recog.RecognitionProcess(stocklist)
-    pass
    # stockdata = w.wsd("0700.HK","open,low,close,volume,amt,pct_chg,turn,mfd_buyamt_a,mfd_sellamt_a,mfd_buyvol_a,mfd_sellvol_a,mfd_netbuyamt,mfd_netbuyvol,mfd_buyamt_d,mfd_sellamt_d,mfn_sn_inflowdays,mfn_sn_outflowdays,mfd_sn_buyamt,mfd_sn_sellamt","2015-01-01", "2023-04-26", "unit=1;traderType=1;TradingCalendar=HKEX;PriceAdj=F")
     # 这一步将数据格式进行转置
     # data=pd.DataFrame(stockdata.Data,index=stockdata.Fields)

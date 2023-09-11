@@ -1,3 +1,5 @@
+import datetime
+
 import talib
 import pandas as pd
 import numpy as np
@@ -16,6 +18,8 @@ class StockClass:
     dayPriceData = pd.DataFrame()
     EMAData = pd.DataFrame()
     trendList= []
+    startDate = datetime.date(1970,1,1) #这里默认给一个起始时间和结束时间
+    endDate = datetime.date(1970,1,2)
 
     #def __init__(self, code,dayPriceDataFrame,emaDataFrame):  # 从数据库中取出的是一个dataframe
     #不接受输入的初始化函数
@@ -30,8 +34,8 @@ class StockClass:
         self.dayPriceData = dayPriceDataFrame
         self.EMAData = emaData
         #############################获取时间########################
-        startdate = self.dayPriceData['DATE'].iloc[0]
-        enddate = self.dayPriceData['DATE'].iloc[-1]
+        self.startDate = self.dayPriceData['DATE'].iloc[0]
+        self.endDate = self.dayPriceData['DATE'].iloc[-1]
 
         '''
         暂时先不用ema跑流程
