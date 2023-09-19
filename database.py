@@ -2,12 +2,14 @@ import datetime
 from WindPy import *
 import sqlalchemy
 #from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
+from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
 import pymysql
 from sqlalchemy.orm import sessionmaker,declarative_base
 import pandas as pd
 import numpy as np
 import stockclass
+import myexception
+import time
 
 # 数据库的地址
 DataBaseAddr = {'hostNAME': '127.0.0.1',
@@ -136,8 +138,10 @@ class GetWindDaTA:
     # 这里是一个dataframe对象的数组，用来存放获取到的wind数据集
     dataSet = []
     dataSetUpdate = []
-    #EMA的周期数
-    emaPeriod = ['5', '10', '20', '30', '60', '120', '250']
+    #EMA的周期数,这里注意，存到数据库里变成数字，和直接从wind拿到的不同
+    #emaPeriod = ['5', '10', '20', '30', '60', '120', '250']
+    emaPeriod = [5, 10, 20, 30, 60, 120, 250]
+
 
     def __init__(self):
         pass
@@ -168,6 +172,9 @@ class GetWindDaTA:
         for code in codelist:
             buffData = w.wsd(code,tableKeyWordForWind[tableName],statrTimeStr, endTimeStr, "unit=1;traderType=1;TradingCalendar=HKEX;PriceAdj=F")
             print(f"获取{code}的日线数据")
+            if buffData.Data[0][0]=='CWSDService: No data.':
+                #抛出无数据的异常
+                raise myexception.ExceptionWindNoData('CWSDService: No data.')
             data = pd.DataFrame(buffData.Data, index=buffData.Fields)
             data = data.T
             data['DATE'] = buffData.Times
@@ -184,8 +191,11 @@ class GetWindDaTA:
         statrTimeStr = startDate.strftime("%Y%m%d")
         endTimeStr = endDate.strftime("%Y%m%d")
         w.start()
+
+
         for code in codelist:
             for period in self.emaPeriod:
+                start_time = time.time()
                 buffData = w.wsd(code, "EXPMA", statrTimeStr, endTimeStr, f"EXPMA_N={period};TradingCalendar=HKEX;PriceAdj=F")
                 # 这里取出的是没有时间的。
                 print(f"获取{code}的{period}ema数据")
@@ -195,6 +205,9 @@ class GetWindDaTA:
                 data['CODE'] = code
                 data['PERIOD'] = period
                 concatDataframe=pd.concat([concatDataframe,data])
+                end_time = time.time()
+                print("耗时: {:.2f}秒".format(end_time - start_time))
+
         #全部一次性写入
         print("开始写入数据库")
         concatDataframe.to_sql(name=tableName, con=engine,schema='ztrade', if_exists="append",index=False)
@@ -232,6 +245,7 @@ class GetWindDaTA:
         w.start()
         for code in codelist:
             for period in self.emaPeriod:
+                start_time = time.time()
                 buffData = w.wsd(code, "EXPMA", statrTimeStr, endTimeStr, f"EXPMA_N={period};TradingCalendar=HKEX;PriceAdj=F")
                 # 这里取出的是没有时间的。
                 print(f"获取{code}的{period}ema数据")
@@ -241,6 +255,8 @@ class GetWindDaTA:
                 data['CODE'] = code
                 data['PERIOD'] = period
                 concatDataframe=pd.concat([concatDataframe,data])
+                end_time = time.time()
+                print("耗时: {:.2f}秒".format(end_time - start_time))
         #返回到dataframe中
         return concatDataframe
 #####################################################################################
@@ -340,28 +356,32 @@ class GetWindDaTA:
         startDateStr = startdate.strftime('%Y-%m-%d')
         endDateStr = enddate.strftime('%Y-%m-%d')
 
-        sql = f'select * from DayPriceData where Code in({codeListStr}) AND Date between "{startDateStr}" and "{endDateStr}"'
+        sql = f'select * from daypricedata where CODE in ({codeListStr}) AND DATE between "{startDateStr}" and "{endDateStr}"'
+        #sql = "select * from daypricedata"
         #left join进行筛选带有expma的数据
         #sql = ‘select * from DayPriceData LEFT JOIN expma ON (DayPriceData.Date=expma.Date AND DayPriceData.Code = expma.Code_ID) where DayPriceData.Code in('1024.HK','3690.HK','0700.HK','0001.HK') AND DayPriceData.Date between "2023-06-01" and "2023-06-05"
         outData = pd.DataFrame()
-        outData=pd.read_sql(sql, con)
+        outData=pd.read_sql(text(sql), con=con)
+        return outData
 
-        result= []
-        testLocals=[]
-        testDict={}
 
+    def GetDataBaseEMA(self, codeList, startdate, enddate):
+        codeListStr = ""
         for code in codeList:
-            codeData=outData[outData['Code']==code]
-            result.append(codeData)
+            codeListStr = codeListStr + "'" + code + "'" + ','
+        codeListStr = codeListStr.rstrip(',')
 
-            testDict['stock'+code] = stock.StockClass(code=code,dayPriceDataFrame=codeData)
+        startDateStr = startdate.strftime('%Y-%m-%d')
+        endDateStr = enddate.strftime('%Y-%m-%d')
 
+        sql = f'select * from expma where CODE in ({codeListStr}) AND DATE between "{startDateStr}" and "{endDateStr}"'
+        # sql = "select * from daypricedata"
+        # left join进行筛选带有expma的数据
+        # sql = ‘select * from DayPriceData LEFT JOIN expma ON (DayPriceData.Date=expma.Date AND DayPriceData.Code = expma.Code_ID) where DayPriceData.Code in('1024.HK','3690.HK','0700.HK','0001.HK') AND DayPriceData.Date between "2023-06-01" and "2023-06-05"
+        outData = pd.DataFrame()
+        outData = pd.read_sql(text(sql), con=con)
 
-
-        print(testDict)
-
-        pass
-        #return outData
+        return outData
 
     def SyncDateBase(self, codeList, startdate, enddate,tablename):
         oneDay=timedelta(days=1)
@@ -372,11 +392,20 @@ class GetWindDaTA:
             codeResult = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).all()
             if len(codeResult) == 0:
                 print(f'表中无该{code}数据,开始获取新数据')
-                self.UpdateTimePeriodData(codelist=codeListBuff, startDate=startdate, endDate=enddate, tableName='daypricedata')
+                try:
+                    self.UpdateTimePeriodData(codelist=codeListBuff, startDate=startdate, endDate=enddate, tableName='daypricedata')
+                except myexception.ExceptionWindNoData as e:
+                    print("非交易日，无数据")
+                    continue
                 self.UpdateTimePeriodDataEMA(codelist=codeListBuff, startDate=startdate, endDate=enddate, tableName='expma')
                 self.UpdateCodeIndex(code,startdate, enddate)
                 continue
-                # 还有一种情况是需要获取的数据范围包裹住了数据库内的数据范围
+
+            # code在表中存在的情况下，在表中获取startdate和enddate
+            index = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).first()
+            dbStartDate = index.STARTDATE
+            dbEndDate = index.ENDDATE
+            # 还有一种情况是需要获取的数据范围包裹住了数据库内的数据范围
             if startdate < dbStartDate and enddate > dbEndDate:
                 print('前后方数据都需要补充')
                 # 补充前方数据
@@ -393,12 +422,9 @@ class GetWindDaTA:
                 # 这里边界以startdate和enddate为准
                 self.UpdateCodeIndex(code, startdate, enddate)
                 continue
-            #code在表中存在的情况下，在表中获取startdate和enddate
-            index = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).first()
-            dbStartDate = index.STARTDATE
-            dbEndDate = index.ENDDATE
 
-            if startdate>=dbEndDate or enddate<=dbStartDate:
+
+            if (startdate>=dbEndDate or enddate<=dbStartDate) and startdate!=enddate:
                 #说明数据库中的时间范围和目标时间范围不重叠，中间的空隙需要补上，否则整个逻辑会失效
                 if startdate>=dbEndDate:
                     print('数据在后方有空隙，进行填补')
@@ -416,6 +442,7 @@ class GetWindDaTA:
                 if startdate>=dbStartDate and enddate<=dbEndDate:
                     #说明日期在包裹之内，不用重新获取
                     print('已有数据，不用获取')
+                    continue
                 else:
                     if startdate>=dbStartDate and enddate>dbEndDate:
                         print('补充后方数据')
@@ -432,10 +459,15 @@ class GetWindDaTA:
                             dbStartDateBuff = startdatebuff
                             dbEndDateBuff = dbEndDate
             #根据日期情况鞥新数据
-            self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+            try:
+                self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+            except myexception.ExceptionWindNoData as e:
+                print("非交易日，无数据")
+                continue
             self.UpdateTimePeriodDataEMA(codeListBuff, startdatebuff, endDatebuff, tableName='expma')
             self.UpdateCodeIndex(code, dbStartDateBuff, dbEndDateBuff)
 
+    #用来同步数据库中的数据时间的函数
     def UpdateCodeIndex(self,code,startDate,endDate):
         # 更新codeindex表的数据
         queryResult = session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).all()
@@ -445,3 +477,43 @@ class GetWindDaTA:
         else:
             session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).update({"STARTDATE": startDate, "ENDDATE": endDate})
         session.commit()
+
+class DataPrepare():
+    def __int__(self):
+        pass
+
+    def DataPreWindDB(self,codelist,startdate,endate):
+        #根据日期，代码获取
+        gwd = GetWindDaTA()
+        gwd.SyncDateBase(codelist, startdate, endate, 'codedateindex')
+
+        #################################测试将数据存进去数据库###########################
+        # complexData = gwd.GetTimePeriodData(codelist,startDate,endDate)
+        # complexDataEMA =gwd.GetTimePeriodDataEMA(codelist,startDate,endDate)
+        complexData = gwd.GetDataBase(codelist, startdate, endate)
+        complexDataEMA = gwd.GetDataBaseEMA(codelist, startdate, endate)
+
+        # 声明一个stock类的数组
+        stocklist = [stockclass.StockClass for i in range(len(codelist))]
+        stocklistIndex = 0
+        for code in codelist:
+            buffdata = pd.DataFrame()  # 重新声明，避免浅拷贝
+            buffEMA = pd.DataFrame()
+            buffdata = complexData[complexData['CODE'] == code]
+            # 索引重置
+            buffdata = buffdata.reset_index(drop=True)
+
+            periods = gwd.emaPeriod  # 获取到设定好的ema值
+            for period in periods:
+                buffdataEMA = pd.DataFrame()
+                buffdataEMA = complexDataEMA[(complexDataEMA['CODE'] == code) & (complexDataEMA['PERIOD'] == period)]
+                # 对EMA数据的格式进行操作
+                buffEMA['DATE'] = buffdataEMA['DATE'].values
+                buffEMA[f'EMA{period}'] = buffdataEMA['EXPMA'].values
+
+            # 这里对buffdata要进行排序
+            stockClassBuff = stockclass.StockClass(code, buffdata, buffEMA)
+            stocklist[stocklistIndex] = stockClassBuff
+            stocklistIndex = stocklistIndex + 1
+
+        return stocklist

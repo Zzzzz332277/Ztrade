@@ -7,20 +7,28 @@ import stockclass
 from WindPy import *
 
 
+
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
+    resultTable = pd.DataFrame(columns=['code', 'backstepema', 'EmaDiffusion', 'moneyflow'])
+    #resultDate = datetime.date(1970, 1, 1)
     def __init__(self):
         pass
 
     def RecognitionProcess(self,stocklist):
         for stock in stocklist:
             stockInProcess = stock#取出对象值
+            dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'moneyflow':0}
+
             #取出stocklist后，开始进行识别的操作链'
-            #diffusionRestul = self.EmaDiffusion(stockInProcess)
+            #dicBuff['backstepema']= self.EmaDiffusion(stockInProcess)
             #判断回踩
-            #backStepResult = self.BackStepEma(stockInProcess)
-            catchBottumResult = self.CatchBottom(stockInProcess)
+            dicBuff['EmaDiffusion'] = self.BackStepEma(stockInProcess)
+            #catchBottumResult = self.CatchBottom(stockInProcess)
+
+            self.resultTable.loc[len(self.resultTable)] = dicBuff
         pass
+
     def EmaDiffusion(self, stock):
         print(f"开始识别均线发散：{stock.code}")
         # 根据上下关系判断，均线的顺序也是从上到下降低,5条均线
@@ -29,11 +37,10 @@ class Recognition:
                 if self.RelativeRelationofTwoLine(stock.EMAData['EMA20'], stock.EMAData['EMA30']) == '1up2':
                     if self.RelativeRelationofTwoLine(stock.EMAData['EMA30'], stock.EMAData['EMA60']) == '1up2':
                         print(f"{stock.code}均线发散")
-                        return 'diffusion'
-
+                        return 1
         else:
             print(f"{stock.code}均线不发散")
-            return 'undiffusion'
+            return 0
 
     # 对组件进行逻辑定义，类下有没有更小的类
     def RelativeRelationofTwoLine(self, line1, line2):
@@ -131,10 +138,12 @@ class Recognition:
 
         # 开始确定趋势的时间，起始时间，结束时间，方向
         # dataset = [Trend for _ in range(100)]
-
-
         # trend=Trend(time[1],time[1],time[11]-time[1],'up')
-        for i in range(0, len(pos_1d) - 1):
+        #将pos_1d前方添加一位0表示首位，末尾添加最后一列的位置代表末位
+        pos_1d=np.insert(pos_1d,0,0)
+        pos_1d=np.append(pos_1d,len(line)-1)
+
+        for i in range(0, len(pos_1d)-1):
             index1 = int(pos_1d[i])
             index2 = int(pos_1d[i + 1])
             if line[index1] < line[index2]:
@@ -143,12 +152,12 @@ class Recognition:
                 direction = 'down'
 
             dataset.append(stockclass.Trend(TIME[index1], TIME[index2], TIME[index2] - TIME[index1], direction))
-            stock.trendList=dataset
-
-
+        stock.trendList=dataset
         return dataset
 
     # 均线回踩
+
+
     def BackStepEma(self, stock):
         print(f"开始识别均线回踩：{stock.code}")
         trendlist = self.RecognizeTrend(stock)  # 这里需要改一下，获取到一个trend类的数组
@@ -190,31 +199,40 @@ class Recognition:
         # 返回回踩的均线的值，返回状态是否均线回踩
 
     # 抄底
-    def CatchBottom(self, stock):
+    def EMAUpCross(self, stock):
         print(f'{stock.code}开始通过资金识别底部')
         trendlist = self.RecognizeTrend(stock)  # 判断下降趋势，
         lastTrend = trendlist[-1]
-        if lastTrend.Direction == 'down':
+        databuff = stock.dayPriceData['CLOSE']
+        closePirce = databuff.iloc[-1]  # 取最后一个
+        if lastTrend.Direction == 'up':
             print('不是下降趋势')
             return '不是下降趋势'
         else:
-            cashFlowStartDate = stock.startDate
-            cashFlowEndDate = stock.endDate
-            statrTimeStr = cashFlowStartDate.strftime("%Y%m%d")
-            endTimeStr = cashFlowEndDate.strftime("%Y%m%d")
-            cashFLowBuff = w.wsd(stock.code, "mfd_inflowrate_m", f"{statrTimeStr}", f"{endTimeStr}", "TradingCalendar=HKEX;PriceAdj=F")
-            cashFLow = pd.DataFrame(cashFLowBuff.Data, index=cashFLowBuff.Fields)
-            cashFLow = cashFLow.T
-            cashFLow['TIME'] = cashFLowBuff.Times
-            lastMajorRate = cashFLow['MFD_INFLOWRATE_M'].iloc[-1]
-            if lastMajorRate >50:
-                print('主力资金流入，可能存在抄底机会')
-                return '主力资金流入，可能存在抄底机会'
-            else:
-                print('主力资金流入不足')
-                return '主力资金流入不足'
+            if stock.EMAData['EMA5'].iloc[-1] - stock.EMAData['EMA10'].iloc[-1]>0:
+                print(f"{stock.code}底部5日10日均线金叉")
+                return '底部5日10日均线金叉'
+
 
         # 伪代码
         # 当下行趋势中
         # if 资金大量进入
         # 判断方式，连续几日的资金都大量进入（大量的量化）
+
+    def MoneyFLow(self,stock):
+        cashFlowStartDate = stock.startDate
+        cashFlowEndDate = stock.endDate
+        statrTimeStr = cashFlowStartDate.strftime("%Y%m%d")
+        endTimeStr = cashFlowEndDate.strftime("%Y%m%d")
+        cashFLowBuff = w.wsd(stock.code, "mfd_inflowrate_m", f"{statrTimeStr}", f"{endTimeStr}",
+                             "TradingCalendar=HKEX;PriceAdj=F")
+        cashFLow = pd.DataFrame(cashFLowBuff.Data, index=cashFLowBuff.Fields)
+        cashFLow = cashFLow.T
+        cashFLow['TIME'] = cashFLowBuff.Times
+        lastMajorRate = cashFLow['MFD_INFLOWRATE_M'].iloc[-1]
+        if lastMajorRate > 50:
+            print('主力资金流入，可能存在抄底机会')
+            return '主力资金流入，可能存在抄底机会'
+        else:
+            print('主力资金流入不足')
+            return '主力资金流入不足'
