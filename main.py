@@ -3,7 +3,6 @@ import datetime
 
 import pandas as pd
 from WindPy import *
-from futu import RET_OK
 
 #import matplotlib.pyplot as plt
 #import matplotlib.ticker as ticker
@@ -12,7 +11,7 @@ import basic
 import recognition
 import stockclass
 from talib import EMA
-import futu as ft
+import zfutu
 ################################################################################################
 # 程序开始的地方，后面需要加入__main__的判断
 ################################################################################################
@@ -22,20 +21,26 @@ if __name__ == '__main__':
     gwd= database.GetWindDaTA()
     #f= open(, encoding="utf-8")
 
-    codeDF=pd.read_csv("D:\ztrade\codes.csv")
+    #codeDF=pd.read_csv("D:\ztrade\codes.csv")
+    codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList=codeDF['WindCodes'].tolist()
-    #codelist = ['0700.HK', '3690.HK']
+    #codeList = ['0700.HK', '3690.HK']
     #codelist =['3690.HK']
     startDate = date(2023,8,1)
-    endDate = date(2023,9,18)
+    endDate = date(2023,10,5)
+    gwd.UpdateTimePeriodDataKDJ(codeList, startDate, endDate, 'kdj')
+
+    pass
+
     dtp=database.DataPrepare()
     #准备好待处理的stock类
     stocks=dtp.DataPreWindDB(codeList,startDate,endDate)
     #识别的类
     recog=recognition.Recognition()
     recog.RecognitionProcess(stocks)
-    recog.resultTable
-
+    zft=zfutu.Zfutu()
+    #recog.resultTable['EmaDiffusion']=1
+    zft.ModifyFutuStockList(recog.resultTable,'ztrade')
 
 
 
@@ -55,6 +60,7 @@ EMA['ema30']=talib.SMA(data['CLOSE'],timeperiod=30)
 daoshu_ema=RecognizeTrend(EMA['ema30'].values,data['TIMES'].values)
 #绘制均线
 #ax.plot(np.arange(0, len(MA10)), MA10)  # 绘制5日均线
+
 
 #ax.xaxis.set_major_locator(ticker.MaxNLocator(20))
 

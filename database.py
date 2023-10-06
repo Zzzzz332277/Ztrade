@@ -100,6 +100,16 @@ class ExpMA(Base):
     EXPMA= Column(Float)
     PERIOD= Column(Integer)
 
+class KDJ(Base):
+    __tablename__ = 'KDJ'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+
+    #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATE= Column(Date)
+    KDJ= Column(Float)
+    TYPE= Column(String(60))
+
 class CodeDateIndex(Base):
     __tablename__ = 'CodeDateIndex'
     ID = Column(Integer, primary_key=True)
@@ -212,7 +222,36 @@ class GetWindDaTA:
         print("开始写入数据库")
         concatDataframe.to_sql(name=tableName, con=engine,schema='ztrade', if_exists="append",index=False)
 
-###################################这两个程序是只返回dataframe，不存储##########################################
+    #直接从wind获取kdj指标
+    def UpdateTimePeriodDataKDJ(self, codelist, startDate, endDate, tableName):
+        # 合并字符串
+        KDJType=['1','2','3']
+        concatDataframe = pd.DataFrame(columns=["KDJ", "DATE", "CODE", "TYPE"])
+        statrTimeStr = startDate.strftime("%Y%m%d")
+        endTimeStr = endDate.strftime("%Y%m%d")
+        w.start()
+
+        for code in codelist:
+            for type in KDJType:
+                start_time = time.time()
+                buffData = w.wsd(code, "KDJ", statrTimeStr, endTimeStr,
+                                 f"KDJ_N=9;KDJ_M1=3;KDJ_M2=3;KDJ_IO={type};TradingCalendar=HKEX;PriceAdj=F")
+                # 这里取出的是没有时间的。
+                print(f"获取{code}的KDJ的{type}数据")
+                data = pd.DataFrame(buffData.Data, index=buffData.Fields)
+                data = data.T
+                data['DATE'] = buffData.Times
+                data['CODE'] = code
+                data['TYPE'] = type
+                concatDataframe = pd.concat([concatDataframe, data])
+                end_time = time.time()
+                print("耗时: {:.2f}秒".format(end_time - start_time))
+
+        # 全部一次性写入
+        print("开始写入数据库")
+        concatDataframe.to_sql(name=tableName, con=engine, schema='ztrade', if_exists="append", index=False)
+
+    ###################################这两个程序是只返回dataframe，不存储##########################################
     def GetTimePeriodData(self, codelist, startDate, endDate):
         # 合并字符串
         #用于合并的dataframe
@@ -383,6 +422,7 @@ class GetWindDaTA:
 
         return outData
 
+    #用来更新数据库时间轴
     def SyncDateBase(self, codeList, startdate, enddate,tablename):
         oneDay=timedelta(days=1)
         #需要将单个的code转化为codelist，满足update函数的运行条件
@@ -485,6 +525,7 @@ class DataPrepare():
     def DataPreWindDB(self,codelist,startdate,endate):
         #根据日期，代码获取
         gwd = GetWindDaTA()
+        print('同步数据库')
         gwd.SyncDateBase(codelist, startdate, endate, 'codedateindex')
 
         #################################测试将数据存进去数据库###########################
@@ -497,6 +538,7 @@ class DataPrepare():
         stocklist = [stockclass.StockClass for i in range(len(codelist))]
         stocklistIndex = 0
         for code in codelist:
+            print(f'准备{code}的数据')
             buffdata = pd.DataFrame()  # 重新声明，避免浅拷贝
             buffEMA = pd.DataFrame()
             buffdata = complexData[complexData['CODE'] == code]

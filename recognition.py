@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy import interpolate
@@ -5,12 +7,12 @@ from scipy.misc import derivative
 
 import stockclass
 from WindPy import *
-
+import talib
 
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
-    resultTable = pd.DataFrame(columns=['code', 'backstepema', 'EmaDiffusion', 'moneyflow'])
+    resultTable = pd.DataFrame(columns=['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow'])
     #resultDate = datetime.date(1970, 1, 1)
     def __init__(self):
         pass
@@ -18,16 +20,25 @@ class Recognition:
     def RecognitionProcess(self,stocklist):
         for stock in stocklist:
             stockInProcess = stock#取出对象值
-            dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'moneyflow':0}
+            #加入成交额的判断
+            turnVolumeTresh=5000000 #500万
+            lastClose=stockInProcess.dayPriceData['CLOSE'].iloc[-1]
+            lastVolume=stockInProcess.dayPriceData['VOLUME'].iloc[-1]
+            #成交量超过一亿才进行判断
+            if lastClose*lastVolume>=turnVolumeTresh:
+                dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'EMAUpCross':0,'MoneyFlow':0}
 
-            #取出stocklist后，开始进行识别的操作链'
-            #dicBuff['backstepema']= self.EmaDiffusion(stockInProcess)
-            #判断回踩
-            dicBuff['EmaDiffusion'] = self.BackStepEma(stockInProcess)
-            #catchBottumResult = self.CatchBottom(stockInProcess)
+                #取出stocklist后，开始进行识别的操作链'
+                dicBuff['backstepema']= self.EmaDiffusion(stockInProcess)
+                #判断回踩
+                dicBuff['EmaDiffusion'] = self.BackStepEma(stockInProcess)
+                #catchBottumResult = self.CatchBottom(stockInProcess)
+                dicBuff['EMAUpCross'] = self.EMAUpCross(stockInProcess)
+                #判断资金流入
+                dicBuff['MoneyFlow'] = self.MoneyFLow(stockInProcess)
 
-            self.resultTable.loc[len(self.resultTable)] = dicBuff
-        pass
+                self.resultTable.loc[len(self.resultTable)] = dicBuff
+
 
     def EmaDiffusion(self, stock):
         print(f"开始识别均线发散：{stock.code}")
@@ -169,7 +180,7 @@ class Recognition:
             closePirce = databuff.iloc[-1]  # 取最后一个
             if databuff.iloc[-2] < databuff.iloc[-1]:
                 print('不符合回踩标准')
-                return "不是回踩"
+                return 0
             else:
                 distanceList = []
                 distanceToEma5 = abs(closePirce - stock.EMAData['EMA5'].iloc[-1])
@@ -183,36 +194,37 @@ class Recognition:
                 if pos == 0:
                     pass
                     print(f"{stock.code}回踩5日均线")
-                    return '回踩5日均线'
+                    return 1
                 else:
                     if pos == 1:
                         print(f"{stock.code}回踩10日均线")
-                        return '回踩10日均线'
+                        return 1
                     else:
                         print(f"{stock.code}回踩20日均线")
-                        return '回踩20日均线'
+                        return 1
 
         else:
             print("不是上升趋势")
-            return "不是上升趋势"
+            return 0
         # if kline[close].today/ema30.today<1.1 到底踩哪条均线，需要判断
         # 返回回踩的均线的值，返回状态是否均线回踩
 
     # 抄底
     def EMAUpCross(self, stock):
-        print(f'{stock.code}开始通过资金识别底部')
+        print(f'{stock.code}开始均线金叉识别底部')
         trendlist = self.RecognizeTrend(stock)  # 判断下降趋势，
         lastTrend = trendlist[-1]
         databuff = stock.dayPriceData['CLOSE']
         closePirce = databuff.iloc[-1]  # 取最后一个
         if lastTrend.Direction == 'up':
             print('不是下降趋势')
-            return '不是下降趋势'
+            return 0
         else:
             if stock.EMAData['EMA5'].iloc[-1] - stock.EMAData['EMA10'].iloc[-1]>0:
                 print(f"{stock.code}底部5日10日均线金叉")
-                return '底部5日10日均线金叉'
-
+                return 1
+            else:
+                return 0
 
         # 伪代码
         # 当下行趋势中
@@ -222,17 +234,26 @@ class Recognition:
     def MoneyFLow(self,stock):
         cashFlowStartDate = stock.startDate
         cashFlowEndDate = stock.endDate
-        statrTimeStr = cashFlowStartDate.strftime("%Y%m%d")
-        endTimeStr = cashFlowEndDate.strftime("%Y%m%d")
-        cashFLowBuff = w.wsd(stock.code, "mfd_inflowrate_m", f"{statrTimeStr}", f"{endTimeStr}",
-                             "TradingCalendar=HKEX;PriceAdj=F")
-        cashFLow = pd.DataFrame(cashFLowBuff.Data, index=cashFLowBuff.Fields)
-        cashFLow = cashFLow.T
-        cashFLow['TIME'] = cashFLowBuff.Times
-        lastMajorRate = cashFLow['MFD_INFLOWRATE_M'].iloc[-1]
-        if lastMajorRate > 50:
+        statrTimeStr = cashFlowStartDate.strftime('%Y-%m-%d')
+        endTimeStr = cashFlowEndDate.strftime('%Y-%m-%d')
+        cashFLow=[]
+        w.start()
+        for i in range(0,4):
+            #只获取最后一天的
+            cashFLowbuff=w.wsd(stock.code, "mfd_netbuyamt", endTimeStr, endTimeStr, f"unit=1;traderType={i+1};TradingCalendar=HKEX;PriceAdj=F,ShowBlank=-1")
+            cashFLowList=cashFLowbuff.Data[0]
+            cashFLow.append(cashFLowList[0])
+        if (cashFLow[0])>0 and (cashFLow[1])>0 and (cashFLow[2])>0:
             print('主力资金流入，可能存在抄底机会')
-            return '主力资金流入，可能存在抄底机会'
+            return 1
         else:
-            print('主力资金流入不足')
-            return '主力资金流入不足'
+            print('未见明显主力资金流入')
+            return 0
+
+#预留的以后用来计算技术指标的类
+class TechIndex():
+    def __init__(self):
+        pass
+
+    def CalcKDJ(self,stock,engine):
+        pass
