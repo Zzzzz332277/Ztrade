@@ -21,15 +21,18 @@ if __name__ == '__main__':
     gwd= database.GetWindDaTA()
     #f= open(, encoding="utf-8")
 
-    #codeDF=pd.read_csv("D:\ztrade\codes.csv")
-    codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
+    codeDF=pd.read_csv("D:\ztrade\codes.csv")
+    #codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList=codeDF['WindCodes'].tolist()
     #codeList = ['0700.HK', '3690.HK']
     #codelist =['3690.HK']
-    startDate = date(2023,8,1)
-    endDate = date(2023,10,5)
-    gwd.UpdateTimePeriodDataKDJ(codeList, startDate, endDate, 'kdj')
 
+
+    startDate = date(2023,8,1)
+    endDate = date(2023,10,11)
+    #gwd.UpdateTimePeriodDataKDJ(codeList, startDate, endDate, 'kdj')
+    #tic=recognition.TechIndex()
+    #tic.CalcKDJ(codeList,database.session,database.con)
     pass
 
     dtp=database.DataPrepare()

@@ -107,8 +107,9 @@ class KDJ(Base):
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
     DATE= Column(Date)
-    KDJ= Column(Float)
-    TYPE= Column(String(60))
+    K = Column(Float)
+    D = Column(Float)
+    J = Column(Float)
 
 class CodeDateIndex(Base):
     __tablename__ = 'CodeDateIndex'
@@ -116,6 +117,16 @@ class CodeDateIndex(Base):
     CODE=Column(String(60))
     STARTDATE= Column(Date)
     ENDDATE= Column(Date)
+
+#用于存放技术指标的起始时间的数据
+class TechDateIndex(Base):
+    __tablename__ = 'TechDateIndex'
+    ID = Column(Integer, primary_key=True)
+    CODE = Column(String(60))
+    STARTDATE = Column(Date)
+    ENDDATE = Column(Date)
+    TECHINDEXTYPE = Column(String(60))
+
 
 ####################################创建表格###############################################################
 Base.metadata.create_all(engine)

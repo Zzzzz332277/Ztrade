@@ -1,13 +1,16 @@
+import datetime
+import time
 import warnings
 
 import numpy as np
 import pandas as pd
 from scipy import interpolate
 from scipy.misc import derivative
-
+import database
 import stockclass
 from WindPy import *
 import talib
+from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
 
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
@@ -255,5 +258,102 @@ class TechIndex():
     def __init__(self):
         pass
 
-    def CalcKDJ(self,stock,engine):
-        pass
+
+    '''
+    计算类的模块的处理逻辑，主要是为了解决之前的数据缺失的问题。需要从数据库中多取一个月数据，然后进行判断。
+    整体的计算类模块的逻辑是，先获取到daypricedata日线数据，然后指标数据是少于daypricedata的，然后进行填补。
+    '''
+    def CalcKDJ(self,codelist,session,con):
+        for code in codelist:
+            print(f'计算{code}kdj')
+            # code在表中存在的情况下，在表中获取startdate和enddate
+            index = session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE=='KDJ').first()
+            if index == None:
+                #说明里面没有数据，直接取所有daypricedata进行计算，并更新index
+                index = session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+                dbStartDate = index.STARTDATE
+                dbEndDate = index.ENDDATE
+                startDateStr = dbStartDate.strftime('%Y-%m-%d')
+                endDateStr = dbEndDate.strftime('%Y-%m-%d')
+                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{startDateStr}" and "{endDateStr}"'
+                outData = pd.DataFrame()
+                outData = pd.read_sql(text(sql), con=con)
+                if outData.shape[0]<10:
+                    print('数据不足，无法进行计算求取数据')
+                    return 0
+                # KDJ 值对应的函数是 STOCH
+                KDJResult=self.CalKDJTalib(outData,code)
+                KDJResult.to_sql(name='kdj', con=database.engine, schema='ztrade', if_exists="append", index=False)
+                # 更新index的结果
+                self.UpdateTechIndex(session,code,dbStartDate,dbEndDate,'KDJ')
+
+            else:
+                #后续考虑没有数据的情况，需要进行第一次计算以填充进数据,如果为空会影响到更新index的问题
+                KDJStartDate = index.STARTDATE
+                KDJEndDate = index.ENDDATE
+                #取出日线数据的起始终止值
+                dayPriceDataIndex = session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+                dpdStartDate=dayPriceDataIndex.STARTDATE
+                dpdendDate=dayPriceDataIndex.ENDDATE
+                if KDJEndDate>=dpdendDate:
+                    print('已有KDJ数据，不用计算')
+                    return 0
+
+                #获取之前的多一个月的冗余数据进行
+                dbStartDate=KDJEndDate-timedelta(days=30)
+                dbstartDateStr = dbStartDate.strftime('%Y-%m-%d')
+                dbendDateStr = dpdendDate.strftime('%Y-%m-%d')
+                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dbstartDateStr}" and "{dbendDateStr}"'
+                outData = pd.DataFrame()
+                outData = pd.read_sql(text(sql), con=con)
+                #在数据中定位位置
+                posStart=outData.loc[outData['DATE']==KDJEndDate].index[0]
+                if posStart<12:
+                    print('日线数据不足，无法计算指标')
+                    return 0
+                #因为计算后有多余数值，确定好截取的位置
+                posStartSlice = posStart+1
+                #posEnd =outData.loc[outData['DATE']==dbEndDate].index[0]
+
+                outDataBuff=outData
+                KDJResult = pd.DataFrame()
+                KDJResult=self.CalKDJTalib(outDataBuff,code)
+                KDJResultSlice=KDJResult[posStartSlice:-1]
+                KDJResultSlice.to_sql(name='kdj', con=database.engine, schema='ztrade', if_exists="append", index=False)
+                # 更新index的结果
+                self.UpdateTechIndex(session,code,KDJStartDate,dpdendDate,'KDJ')
+
+    def CalKDJTalib(self,inputDF,code):
+        KDJResult = pd.DataFrame()
+        KDJResult['K'], KDJResult['D'] = talib.STOCH(
+            inputDF['HIGH'].values,
+            inputDF['LOW'].values,
+            inputDF['CLOSE'].values,
+            fastk_period=9,
+            slowk_period=5,
+            slowk_matype=1,
+            slowd_period=5,
+            slowd_matype=1)
+        # 求出J值，J = (3*K)-(2*D)
+        KDJResult['K'].fillna(0, inplace=True)
+        KDJResult['D'].fillna(0, inplace=True)
+        KDJResult['J'] = list(map(lambda x, y: 3 * x - 2 * y, KDJResult['K'], KDJResult['D']))
+        KDJResult.index = range(len(KDJResult))
+        # 保存结果
+        KDJResult['DATE'] = inputDF['DATE']
+        KDJResult['CODE'] = code
+        return KDJResult
+
+    def UpdateTechIndex(self,session,code,startDate,endDate,techIndexType):
+        queryResult = session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE==techIndexType).all()
+        if len(queryResult) == 0:
+            codeDateIndexbuff = database.TechDateIndex(CODE=code, STARTDATE=startDate, ENDDATE=endDate,
+                                                       TECHINDEXTYPE=techIndexType)
+            session.add(codeDateIndexbuff)
+        else:
+            session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE==techIndexType).update(
+                {"STARTDATE": startDate, "ENDDATE": startDate, "TECHINDEXTYPE": techIndexType})
+        session.commit()
+            
+
+
