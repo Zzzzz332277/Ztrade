@@ -9,13 +9,14 @@ quote_ctx.set_handler(ft.TickerHandlerBase())  # 设置用于异步处理数据�
 #处理数据并与富途进行通信的类
 
 ############测试自选股功能#####################
+'''
 codeList=['HK.03678','HK.02291']
 ret, data = quote_ctx.modify_user_security('ztrade', ModifyUserSecurityOp.MOVE_OUT, codeList)
 if ret == RET_OK:
     print(data)  # 返回 success
 else:
     print('error:', data)
-
+'''
 
 
 class Zfutu():
@@ -30,7 +31,7 @@ class Zfutu():
         for i in range(len(resultTable)):
             listbuff=resultTable.loc[i]
             #通过设置1和0的flag来判断是否是识别到了
-            if (listbuff['backstepema']+listbuff['EmaDiffusion']+listbuff['EMAUpCross'])>0:
+            if (listbuff['backstepema']+listbuff['EmaDiffusion']+listbuff['EMAUpCross']+listbuff['MoneyFlow'])>0:
                 codelist.append(listbuff['code'])
         codelistNew=self.CodeTransferWind2FUTU(codelist)
         ret, data = quote_ctx.get_user_security(listname)
@@ -49,7 +50,7 @@ class Zfutu():
             print('error:', data)
         codeListEveryDayWatch = everyDayWatchData['code'].tolist()
 
-        #先清空自选
+        #先清空ztrade自选
         ret, data = quote_ctx.modify_user_security(listname, ModifyUserSecurityOp.DEL,codeListMoveOut)
         if ret == RET_OK:
             print(data)  # 返回 success
@@ -67,6 +68,8 @@ class Zfutu():
             print(data)  # 返回 success
         else:
             print('error:', data)
+
+
     #将wind的代码与富途进行转化
     def CodeTransferWind2FUTU(self,codelist):
         codelistNew=list()

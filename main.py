@@ -3,6 +3,7 @@ import datetime
 
 import pandas as pd
 from WindPy import *
+from sqlalchemy import text
 
 #import matplotlib.pyplot as plt
 #import matplotlib.ticker as ticker
@@ -28,13 +29,19 @@ if __name__ == '__main__':
     #codelist =['3690.HK']
 
 
+
     startDate = date(2023,8,1)
-    endDate = date(2023,10,11)
+    endDate = date(2023,10,19)
     #gwd.UpdateTimePeriodDataKDJ(codeList, startDate, endDate, 'kdj')
     #tic=recognition.TechIndex()
     #tic.CalcKDJ(codeList,database.session,database.con)
-    pass
 
+    #codeList=['0003.HK']
+    #ti=recognition.TechIndex()
+    #ti.CalAllEMA(testCodelist, database.session,database.con)
+
+
+    pass
     dtp=database.DataPrepare()
     #准备好待处理的stock类
     stocks=dtp.DataPreWindDB(codeList,startDate,endDate)
@@ -44,7 +51,7 @@ if __name__ == '__main__':
     zft=zfutu.Zfutu()
     #recog.resultTable['EmaDiffusion']=1
     zft.ModifyFutuStockList(recog.resultTable,'ztrade')
-
+    pass
 
 
 '''
