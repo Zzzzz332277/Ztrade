@@ -28,47 +28,42 @@ class Zfutu():
 
     def ModifyFutuStockList(self,resultTable,listname):
         codelist=list()
-        for i in range(len(resultTable)):
-            listbuff=resultTable.loc[i]
-            #通过设置1和0的flag来判断是否是识别到了
-            if (listbuff['backstepema']+listbuff['EmaDiffusion']+listbuff['EMAUpCross']+listbuff['MoneyFlow'])>0:
-                codelist.append(listbuff['code'])
-        codelistNew=self.CodeTransferWind2FUTU(codelist)
-        ret, data = quote_ctx.get_user_security(listname)
-        if ret == RET_OK:
-            pass
-            #print(data)  # 返回 success
-        else:
-            print('error:', data)
-        codeListMoveOut=data['code'].tolist()
+        listNameList= ['backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc']
         #########################这里需要注意，对每日关注的列表进行保留操作，以免删除ztrade时候也删除了自选股###########################################
         ret, everyDayWatchData = quote_ctx.get_user_security('每日关注')
         if ret == RET_OK:
             pass
             # print(data)  # 返回 success
         else:
-            print('error:', data)
+            print('error:', everyDayWatchData)
         codeListEveryDayWatch = everyDayWatchData['code'].tolist()
+        ##########################################################################################################
+        '''
+        for i in range(len(resultTable)):
+            listbuff=resultTable.loc[i]
+            #通过设置1和0的flag来判断是否是识别到了
+            #判断一列中是否有不是全0
+            flag=0
+            for key in listbuff.keys():
+                #跳过code
+                if key!='code':
+                    flag=flag+listbuff[key]
 
-        #先清空ztrade自选
-        ret, data = quote_ctx.modify_user_security(listname, ModifyUserSecurityOp.DEL,codeListMoveOut)
-        if ret == RET_OK:
-            print(data)  # 返回 success
-        else:
-            print('error:', data)
-        #再加入新的自选
-        ret, data = quote_ctx.modify_user_security(listname, ModifyUserSecurityOp.ADD,codelistNew)
-        if ret == RET_OK:
-            print(data)  # 返回 success
-        else:
-            print('error:', data)
+            if flag>0:
+                codelist.append(listbuff['code'])
+        '''
+        ##################################################先讲原先的list清除########################
+        self.CleanOutFUTUList(listNameList)
+        #将resulttable中的结果按识别内容分类，并清除为0的行
+        for listName in listNameList:
+            resultTableSliced=resultTable[['code',listName]]
+            resultTableSliced=resultTableSliced.loc[~((resultTableSliced[listName] == 0) )]
+            codeList=resultTableSliced['code'].tolist()
+            codelistNew=self.CodeTransferWind2FUTU(codeList)
+            self.AddFutuList(listname=listName,list=codelistNew)
+            time.sleep(0.1)
         ###################################再恢复每日关注的股票#####################################
-        ret, data = quote_ctx.modify_user_security('每日关注', ModifyUserSecurityOp.ADD, codeListEveryDayWatch)
-        if ret == RET_OK:
-            print(data)  # 返回 success
-        else:
-            print('error:', data)
-
+        self.AddFutuList(listname='每日关注', list=codeListEveryDayWatch)
 
     #将wind的代码与富途进行转化
     def CodeTransferWind2FUTU(self,codelist):
@@ -78,3 +73,29 @@ class Zfutu():
             codeNew=codebuff[1]+'.'+'0'+codebuff[0]
             codelistNew.append(codeNew)
         return codelistNew
+
+    def CleanOutFUTUList(self,listnamelist):
+        #需要将代码在wind和futu间转换
+        for list in listnamelist:
+            ret, data = quote_ctx.get_user_security(list)
+            if ret == RET_OK:
+                pass
+                # print(data)  # 返回 success
+            else:
+                print('error:', data)
+            codeListMoveOut = data['code'].tolist()
+
+            # 挨个清空自选
+            ret, data = quote_ctx.modify_user_security(list, ModifyUserSecurityOp.DEL, codeListMoveOut)
+            if ret == RET_OK:
+                print(data)  # 返回 success
+            else:
+                print('error:', data)
+
+    def AddFutuList(self,listname,list):
+        # 再加入新的自选
+        ret, data = quote_ctx.modify_user_security(listname, ModifyUserSecurityOp.ADD, list)
+        if ret == RET_OK:
+            print(data)  # 返回 success
+        else:
+            print('error:', data)

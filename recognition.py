@@ -27,13 +27,16 @@ delta=outDataEMA10value-ema_10
 pass
 '''
 
+# gwd.UpdateTimePeriodDataKDJ(codeList, startDate, endDate, 'kdj')
+# tic=recognition.TechIndex()
+# tic.CalcKDJ(codeList,database.session,database.con)
 
 
 
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
-    resultTable = pd.DataFrame(columns=['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow'])
+    resultTable = pd.DataFrame(columns=['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc'])
     #resultDate = datetime.date(1970, 1, 1)
     def __init__(self):
         pass
@@ -47,7 +50,7 @@ class Recognition:
             lastVolume=stockInProcess.dayPriceData['VOLUME'].iloc[-1]
             #成交量超过一亿才进行判断
             if lastClose*lastVolume>=turnVolumeTresh:
-                dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'EMAUpCross':0,'MoneyFlow':0}
+                dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'EMAUpCross':0,'MoneyFlow':0,'EMA5BottomArc':0}
 
                 #取出stocklist后，开始进行识别的操作链'
                 dicBuff['backstepema']= self.BackStepEma(stockInProcess)
@@ -57,6 +60,8 @@ class Recognition:
                 dicBuff['EMAUpCross'] = self.EMAUpCross(stockInProcess)
                 #判断资金流入
                 #dicBuff['MoneyFlow'] = self.MoneyFLow(stockInProcess)
+                # 判断底部圆弧
+                dicBuff['EMA5BottomArc'] = self.EMA5BottomArc(stockInProcess)
                 #将结果添加到resultable
                 self.resultTable.loc[len(self.resultTable)] = dicBuff
 
@@ -200,18 +205,18 @@ class Recognition:
         return dataset
 
     # 均线回踩
-
-
     def BackStepEma(self, stock):
         print(f"开始识别均线回踩：{stock.code}")
         trendlist = self.RecognizeTrend(stock)  # 这里需要改一下，获取到一个trend类的数组
         # 当60日均线的趋势是向上的，而且在趋势中时
         lastTrend = trendlist[-1]
         if lastTrend.Direction == 'up':
-            # if kline[close].today/ema20.today<1.1 根据一个比例来进行判断 当天的价格
             databuff = stock.dayPriceData['CLOSE']
+            #增加下影线和蜡烛实体的比例判断，因为阳柱阴柱处理方式不同，用min来处理
+            downShadowLen=abs(min(stock.dayPriceData['CLOSE'].iloc[-1],stock.dayPriceData['OPEN'].iloc[-1])-stock.dayPriceData['LOW'].iloc[-1])
+            candleLen=abs(stock.dayPriceData['CLOSE'].iloc[-1]-stock.dayPriceData['OPEN'].iloc[-1])
             closePirce = databuff.iloc[-1]  # 取最后一个
-            if databuff.iloc[-2] < databuff.iloc[-1]:
+            if (databuff.iloc[-2] < databuff.iloc[-1]) or (downShadowLen < candleLen):
                 print('不符合回踩标准')
                 return 0
             else:
@@ -239,7 +244,6 @@ class Recognition:
         else:
             print("不是上升趋势")
             return 0
-        # if kline[close].today/ema30.today<1.1 到底踩哪条均线，需要判断
         # 返回回踩的均线的值，返回状态是否均线回踩
 
     # 抄底
@@ -270,18 +274,70 @@ class Recognition:
         statrTimeStr = cashFlowStartDate.strftime('%Y-%m-%d')
         endTimeStr = cashFlowEndDate.strftime('%Y-%m-%d')
         cashFLow=[]
+        treshHold=0.25
+        #获取当天的成交量和成交额
+        lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+        lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+        lastVolume = stock.dayPriceData['VOLUME'].iloc[-1]
+        turnVolume=((lastClose+lastOpen)/2)*lastVolume
         w.start()
         for i in range(0,4):
             #只获取最后一天的
             cashFLowbuff=w.wsd(stock.code, "mfd_netbuyamt", endTimeStr, endTimeStr, f"unit=1;traderType={i+1};TradingCalendar=HKEX;PriceAdj=F,ShowBlank=-1")
             cashFLowList=cashFLowbuff.Data[0]
             cashFLow.append(cashFLowList[0])
-        if (cashFLow[0])>0 and (cashFLow[1])>0 and (cashFLow[2])>0:
+        #if (cashFLow[0])>0 and (cashFLow[1])>0 and (cashFLow[2])>0:
+        totalFlowIn=cashFLow[0]+cashFLow[1]+cashFLow[2]+cashFLow[3]
+        flowInRatio=totalFlowIn/turnVolume
+        if flowInRatio>treshHold:
             print('主力资金流入，可能存在抄底机会')
             return 1
-        else:
-            print('未见明显主力资金流入')
+
+        print('未见明显主力资金流入')
+        return 0
+
+    #EMA均线的圆形底
+    def EMA5BottomArc(self,stock):
+        print('开始识别弧形底部')
+        #这里先锁死5个值
+        type='5'
+        if type != '3' and type != '5':
+            print('type 错误')
             return 0
+
+        if type=='5':
+            #5个值
+            data=stock.EMAData['EMA5']
+            arr=np.zeros(5)
+            for i in range(0,5):
+                #取最后5个
+                arr[i]=stock.EMAData['EMA5'].iloc[i-5]
+            posMin=np.argmin(arr)
+            if posMin==2:
+                if arr[1]<arr[0] and arr[3]<arr[4]:
+                    print("弧形底")
+                    return 1
+            if posMin==3:
+                if arr[1]<arr[0] and arr[2]<arr[1]:
+                    print("弧形底")
+                    return 1
+            print("不是弧形底")
+            return 0
+
+        if type == '3':
+            # 3个值
+            data = stock.EMAData['EMA5']
+            arr = np.array()
+            for i in range(0, 3):
+                arr[i] = stock.EMAData['EMA5'].iloc[i - 3]
+            posMin = np.argmin(arr)
+            if posMin == 1:
+                print("弧形底")
+                return 1
+
+            print("不是弧形底")
+            return 0
+
 
 #预留的以后用来计算技术指标的类
 class TechIndex():
