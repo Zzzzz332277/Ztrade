@@ -12,6 +12,8 @@ from WindPy import *
 import talib
 from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
 import basic
+import zfutu
+from futu import *
 ##################################测试使用pandas ewm计算ema#########################
 '''
 sql = f'select * from daypricedata where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-10-17"'
@@ -50,6 +52,7 @@ class Recognition:
             lastVolume=stockInProcess.dayPriceData['VOLUME'].iloc[-1]
             #成交量超过一亿才进行判断
             if lastClose*lastVolume>=turnVolumeTresh:
+                t1=time.time()
                 dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'EMAUpCross':0,'MoneyFlow':0,'EMA5BottomArc':0}
 
                 #取出stocklist后，开始进行识别的操作链'
@@ -59,11 +62,13 @@ class Recognition:
                 #catchBottumResult = self.CatchBottom(stockInProcess)
                 dicBuff['EMAUpCross'] = self.EMAUpCross(stockInProcess)
                 #判断资金流入
-                #dicBuff['MoneyFlow'] = self.MoneyFLow(stockInProcess)
+                dicBuff['MoneyFlow'] = self.MoneyFLowFutu(stockInProcess)
                 # 判断底部圆弧
                 dicBuff['EMA5BottomArc'] = self.EMA5BottomArc(stockInProcess)
                 #将结果添加到resultable
                 self.resultTable.loc[len(self.resultTable)] = dicBuff
+                t2 = time.time()
+                print("运行时间：" + str((t2 - t1) / 1000000) + "秒")
 
 
     def EmaDiffusion(self, stock):
@@ -268,7 +273,7 @@ class Recognition:
         # if 资金大量进入
         # 判断方式，连续几日的资金都大量进入（大量的量化）
 
-    def MoneyFLow(self,stock):
+    def MoneyFLowWIND(self,stock):
         cashFlowStartDate = stock.startDate
         cashFlowEndDate = stock.endDate
         statrTimeStr = cashFlowStartDate.strftime('%Y-%m-%d')
@@ -283,12 +288,49 @@ class Recognition:
         w.start()
         for i in range(0,4):
             #只获取最后一天的
-            cashFLowbuff=w.wsd(stock.code, "mfd_netbuyamt", endTimeStr, endTimeStr, f"unit=1;traderType={i+1};TradingCalendar=HKEX;PriceAdj=F,ShowBlank=-1")
+            cashFLowbuff=w.wsd(stock.code, "mfd_netbuyamt", endTimeStr, endTimeStr, f"traderType={i+1};TradingCalendar={self.tradingCalendar};PriceAdj=F,ShowBlank=-1")
             cashFLowList=cashFLowbuff.Data[0]
             cashFLow.append(cashFLowList[0])
         #if (cashFLow[0])>0 and (cashFLow[1])>0 and (cashFLow[2])>0:
         totalFlowIn=cashFLow[0]+cashFLow[1]+cashFLow[2]+cashFLow[3]
         flowInRatio=totalFlowIn/turnVolume
+        if flowInRatio>treshHold:
+            print('主力资金流入，可能存在抄底机会')
+            return 1
+
+        print('未见明显主力资金流入')
+        return 0
+
+    def MoneyFLowFutu(self,stock):
+        #富途默认是当天的结果，没有日期参数
+        treshHold = 0.20
+        #先进行转化code
+        codeFutu=zfutu.CodeTransWind2FUTU(stock.code)
+        ret, data = zfutu.quote_ctx.get_capital_distribution(codeFutu)
+        if ret == RET_OK:
+            #获取四个分类的资金流入
+            print("获取资金成功")
+            cashFLowSup=data['capital_in_super'].values-data['capital_out_super'].values
+            cashFLowBig=data['capital_in_big'].values-data['capital_out_big'].values
+            cashFLowMid=data['capital_in_mid'].values-data['capital_out_mid'].values
+            cashFLowSmall=data['capital_in_small'].values-data['capital_out_small'].values
+        else:
+            print('error:', data)
+            return 0
+        #睡一秒，富途接口调用限制30S30次
+        time.sleep(1)
+        #获取当天的成交量和成交额
+        lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+        lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+        lastVolume = stock.dayPriceData['VOLUME'].iloc[-1]
+        turnVolume=((lastClose+lastOpen)/2)*lastVolume
+
+        totalCashFlowIn=cashFLowSup+cashFLowBig+cashFLowMid+cashFLowSmall
+
+        if totalCashFlowIn<10000000:
+            print('流入资金不足1000万')
+            return 0
+        flowInRatio=totalCashFlowIn/turnVolume
         if flowInRatio>treshHold:
             print('主力资金流入，可能存在抄底机会')
             return 1
@@ -341,7 +383,12 @@ class Recognition:
 
 #预留的以后用来计算技术指标的类
 class TechIndex():
-    def __init__(self):
+    def __init__(self, con, engine, session, tradingcalendar):
+        # 初始化时配置数据库连接
+        self.con = con
+        self.engine = engine
+        self.session = session
+        self.tradingCalendar = tradingcalendar
         pass
 
 
@@ -349,36 +396,37 @@ class TechIndex():
     计算类的模块的处理逻辑，主要是为了解决之前的数据缺失的问题。需要从数据库中多取一个月数据，然后进行判断。
     整体的计算类模块的逻辑是，先获取到daypricedata日线数据，然后指标数据是少于daypricedata的，然后进行填补。
     '''
-    def CalcKDJ(self,codelist,session,con):
+    def CalcKDJ(self,codelist):
         for code in codelist:
             print(f'计算{code} kdj')
             # code在表中存在的情况下，在表中获取startdate和enddate
-            index = session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE=='KDJ').first()
+            index = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE=='KDJ').first()
             if index == None:
                 #说明里面没有数据，直接取所有daypricedata进行计算，并更新index
-                index = session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+                index = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
                 dbStartDate = index.STARTDATE
                 dbEndDate = index.ENDDATE
                 startDateStr = dbStartDate.strftime('%Y-%m-%d')
                 endDateStr = dbEndDate.strftime('%Y-%m-%d')
                 sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{startDateStr}" and "{endDateStr}"'
                 outData = pd.DataFrame()
-                outData = pd.read_sql(text(sql), con=con)
+                outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
                 if outData.shape[0]<10:
                     print('数据不足，无法进行计算求取数据')
                     continue
                 # KDJ 值对应的函数是 STOCH
                 KDJResult=self.CalKDJTalib(outData,code)
-                KDJResult.to_sql(name='kdj', con=database.engine, schema='ztrade', if_exists="append", index=False)
+                KDJResult.to_sql(name='kdj', con=self.engine, if_exists="append", index=False)
+                self.con.commit()
                 # 更新index的结果
-                self.UpdateTechIndex(session,code,dbStartDate,dbEndDate,'KDJ')
+                self.UpdateTechIndex(self.session,code,dbStartDate,dbEndDate,'KDJ')
 
             else:
                 KDJStartDate = index.STARTDATE
                 KDJEndDate = index.ENDDATE
                 #取出日线数据的起始终止值
-                dayPriceDataIndex = session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+                dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
                 dpdStartDate=dayPriceDataIndex.STARTDATE
                 dpdendDate=dayPriceDataIndex.ENDDATE
                 if KDJEndDate>=dpdendDate:
@@ -391,7 +439,7 @@ class TechIndex():
                 dbendDateStr = dpdendDate.strftime('%Y-%m-%d')
                 sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dbstartDateStr}" and "{dbendDateStr}"'
                 outData = pd.DataFrame()
-                outData = pd.read_sql(text(sql), con=con)
+                outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
                 #在数据中定位位置
                 posStart=outData.loc[outData['DATE']==KDJEndDate].index[0]
@@ -406,9 +454,11 @@ class TechIndex():
                 KDJResult = pd.DataFrame()
                 KDJResult=self.CalKDJTalib(outDataBuff,code)
                 KDJResultSlice=KDJResult[posStartSlice:-1]
-                KDJResultSlice.to_sql(name='kdj', con=database.engine, schema='ztrade', if_exists="append", index=False)
+                KDJResultSlice.to_sql(name='kdj', con=self.engine, if_exists="append", index=False)
+                self.con.commit()
+
                 # 更新index的结果
-                self.UpdateTechIndex(session,code,KDJStartDate,dpdendDate,'KDJ')
+                self.UpdateTechIndex(self.session,code,KDJStartDate,dpdendDate,'KDJ')
 
     def CalKDJTalib(self,inputDF,code):
         KDJResult = pd.DataFrame()
@@ -431,14 +481,14 @@ class TechIndex():
         KDJResult['CODE'] = code
         return KDJResult
 
-    def CalAllEMA(self,codelist,session,con):
+    def CalAllEMA(self,codelist):
         w.start()
         for code in codelist:
             print(f'计算{code} EMA')
             emaPreValueDict={} #用来存放各个周期的第一个值的字典
             # code在表中存在的情况下，在表中分别获取日线数据和ema数据的startdate和enddate
-            EMAindex = session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'EMA').first()
-            dayPriceDataIndex = session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+            EMAindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'EMA').first()
+            dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
             if dayPriceDataIndex == None:
                 print(f'{code}没有日线数据,无法计算')
                 continue
@@ -458,7 +508,7 @@ class TechIndex():
                 EmaCalEndDate=dayPriceDataIndex.ENDDATE
                 for period in basic.emaPeriod:
                     buffData = w.wsd(code, "EXPMA", PreValueDateStr, PreValueDateStr,
-                                     f"EXPMA_N={period};TradingCalendar=HKEX;PriceAdj=F")
+                                     f"EXPMA_N={period};TradingCalendar={self.tradingCalendar};PriceAdj=F")
                     # 这里取出的是没有时间的。
                     print(f"获取{code}的{period}ema数据")
                     buff=buffData.Data[0]
@@ -473,7 +523,7 @@ class TechIndex():
                 EmaCalEndDate = dayPriceDataIndex.ENDDATE
                 # 查询EMA取出前一个值并计算
                 for period in basic.emaPeriod:
-                    EMAFirst = session.query(database.ExpMA).filter(database.ExpMA.CODE == code,database.ExpMA.DATE==EMAIndexEndDate,database.ExpMA.PERIOD==period).first()
+                    EMAFirst = self.session.query(database.ExpMA).filter(database.ExpMA.CODE == code,database.ExpMA.DATE==EMAIndexEndDate,database.ExpMA.PERIOD==period).first()
                     emaPreValueDict[period]=EMAFirst.EXPMA
             #获取到各个周期第一个值后，获取darpricedata的值,并进行EMA的计算
 
@@ -481,7 +531,7 @@ class TechIndex():
             EmaCalEndDateStr=EmaCalEndDate.strftime('%Y-%m-%d')
             sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{EmaCalStartDateStr}" and "{EmaCalEndDateStr}"'
             outData = pd.DataFrame()
-            outData = pd.read_sql(text(sql), con=con)
+            outData = pd.read_sql(text(sql), con=self.con)
             outData=outData.sort_values(by="DATE",ascending=True)
             closeDataList=outData['CLOSE'].tolist()
             #存储计算结果
@@ -496,8 +546,10 @@ class TechIndex():
                 concatDataframe = pd.concat([concatDataframe, EMACalResult])
 
             #写入数据库,并更新index
-            concatDataframe.to_sql(name='expma', con=database.engine, schema='ztrade', if_exists="append", index=False)
-            self.UpdateTechIndex(session,code,EMAIndexStartDate,EmaCalEndDate,'ema')
+            concatDataframe.to_sql(name='expma', con=self.engine, if_exists="append", index=False)
+            #pymysql更新后需要提交事务，避免查不到数据
+            self.con.commit()
+            self.UpdateTechIndex(self.session,code,EMAIndexStartDate,EmaCalEndDate,'ema')
 
     def CalSingleEMA(self,list,period,prevalue):
         data = [0 for _ in range(len(list))]

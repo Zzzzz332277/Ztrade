@@ -18,17 +18,31 @@ else:
     print('error:', data)
 '''
 
+#用于转化单个code的函数
+def CodeTransWind2FUTU(code):
+    codebuff = code.split('.')
+    codeNew = codebuff[1] + '.' + '0' + codebuff[0]
+    return codeNew
 
 class Zfutu():
-    def __int__(self):
-        pass
+    def __init__(self,market):
+        self.market=market
+        self.recogList = ['backstepema', 'EMAUpCross', 'MoneyFlow', 'EMA5BottomArc']
+        if market=='HK':
+            self.listNameList=['backstepemaHK', 'EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK']
+        elif market=='US':
+            self.listNameList= ['backstepemaUS', 'EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS']
+        else:
+            print('市场输入错误')
+            return
 
     def FutuDisConnect(self):
         quote_ctx.close()  # 结束后记得关闭当条连接，防止连接条数用尽
 
-    def ModifyFutuStockList(self,resultTable,listname):
+    def ModifyFutuStockList(self,resultTable):
         codelist=list()
-        listNameList= ['backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc']
+        #listNameList= ['backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc']
+        #去除emaDiffusion，减少接口调用次数
         #########################这里需要注意，对每日关注的列表进行保留操作，以免删除ztrade时候也删除了自选股###########################################
         ret, everyDayWatchData = quote_ctx.get_user_security('每日关注')
         if ret == RET_OK:
@@ -37,40 +51,30 @@ class Zfutu():
         else:
             print('error:', everyDayWatchData)
         codeListEveryDayWatch = everyDayWatchData['code'].tolist()
-        ##########################################################################################################
-        '''
-        for i in range(len(resultTable)):
-            listbuff=resultTable.loc[i]
-            #通过设置1和0的flag来判断是否是识别到了
-            #判断一列中是否有不是全0
-            flag=0
-            for key in listbuff.keys():
-                #跳过code
-                if key!='code':
-                    flag=flag+listbuff[key]
 
-            if flag>0:
-                codelist.append(listbuff['code'])
-        '''
         ##################################################先讲原先的list清除########################
-        self.CleanOutFUTUList(listNameList)
+        self.CleanOutFUTUList(self.listNameList)
         #将resulttable中的结果按识别内容分类，并清除为0的行
-        for listName in listNameList:
-            resultTableSliced=resultTable[['code',listName]]
-            resultTableSliced=resultTableSliced.loc[~((resultTableSliced[listName] == 0) )]
+        for index,recogName in enumerate(self.recogList):
+            resultTableSliced=resultTable[['code',recogName]]
+            resultTableSliced=resultTableSliced.loc[~((resultTableSliced[recogName] == 0) )]
             codeList=resultTableSliced['code'].tolist()
             codelistNew=self.CodeTransferWind2FUTU(codeList)
-            self.AddFutuList(listname=listName,list=codelistNew)
+            self.AddFutuList(listname=self.listNameList[index],list=codelistNew)
             time.sleep(0.1)
         ###################################再恢复每日关注的股票#####################################
+        time.sleep(1)
         self.AddFutuList(listname='每日关注', list=codeListEveryDayWatch)
 
     #将wind的代码与富途进行转化
     def CodeTransferWind2FUTU(self,codelist):
-        codelistNew=list()
+        codelistNew = list()
         for code in codelist:
             codebuff=code.split('.')
-            codeNew=codebuff[1]+'.'+'0'+codebuff[0]
+            if self.market == 'HK':
+                codeNew=codebuff[1]+'.'+'0'+codebuff[0]
+            elif self.market == 'US':
+                codeNew = 'US'+'.'+codebuff[0]
             codelistNew.append(codeNew)
         return codelistNew
 
@@ -99,3 +103,4 @@ class Zfutu():
             print(data)  # 返回 success
         else:
             print('error:', data)
+
