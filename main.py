@@ -32,7 +32,7 @@ def ZtradeHK():
     codeList = codeDF['WindCodes'].tolist()
 
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 10, 27)
+    endDate = date(2023, 10, 31)
 
     #codeList=['0001.HK']
 
@@ -44,7 +44,7 @@ def ZtradeHK():
     # 识别的类
     recog = recognition.Recognition()
     recog.RecognitionProcess(stocks)
-    zft = zfutu.Zfutu('HK')
+    zft = zfutu.Zfutu(market='HK')
     zft.ModifyFutuStockList(recog.resultTable)
     pass
 
@@ -56,7 +56,7 @@ def ZtradeUS():
     codeList = codeDF['WindCodes'].tolist()
 
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 10, 27)
+    endDate = date(2023, 10, 30)
 
     #codeList=['AAPL.O']
 

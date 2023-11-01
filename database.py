@@ -664,7 +664,7 @@ class DataPrepare():
                 buffEMA[f'EMA{period}'] = buffdataEMA['EXPMA'].values
 
             # 这里对buffdata要进行排序
-            stockClassBuff = stockclass.StockClass(code, buffdata, buffEMA)
+            stockClassBuff = stockclass.StockClass(code, buffdata, buffEMA,self.tradingCalendar)
             stocklist[stocklistIndex] = stockClassBuff
             stocklistIndex = stocklistIndex + 1
 

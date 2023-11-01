@@ -38,8 +38,8 @@ pass
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
-    resultTable = pd.DataFrame(columns=['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc'])
-    #resultDate = datetime.date(1970, 1, 1)
+    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
+    resultTable = pd.DataFrame(columns=recogProcList)
     def __init__(self):
         pass
 
@@ -53,7 +53,10 @@ class Recognition:
             #成交量超过一亿才进行判断
             if lastClose*lastVolume>=turnVolumeTresh:
                 t1=time.time()
-                dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'EMAUpCross':0,'MoneyFlow':0,'EMA5BottomArc':0}
+                #这里自动生成字典
+                dicBuff={i:0 for i in self.recogProcList}
+                dicBuff['code']=stockInProcess.code
+                #dicBuff={'code':stockInProcess.code,'backstepema':0, 'EmaDiffusion':0, 'EMAUpCross':0,'MoneyFlow':0,'EMA5BottomArc':0,'EMA5TOPArc'""}
 
                 #取出stocklist后，开始进行识别的操作链'
                 dicBuff['backstepema']= self.BackStepEma(stockInProcess)
@@ -65,6 +68,11 @@ class Recognition:
                 dicBuff['MoneyFlow'] = self.MoneyFLowFutu(stockInProcess)
                 # 判断底部圆弧
                 dicBuff['EMA5BottomArc'] = self.EMA5BottomArc(stockInProcess)
+                #识别顶部圆弧
+                dicBuff['EMA5TOPArc'] = self.EMA5TOPArc(stockInProcess)
+                # 识别顶部EMA均线死叉
+                dicBuff['EMADownCross'] = self.EMADownCross(stockInProcess)
+
                 #将结果添加到resultable
                 self.resultTable.loc[len(self.resultTable)] = dicBuff
                 t2 = time.time()
@@ -326,7 +334,8 @@ class Recognition:
         turnVolume=((lastClose+lastOpen)/2)*lastVolume
 
         totalCashFlowIn=cashFLowSup+cashFLowBig+cashFLowMid+cashFLowSmall
-
+        #将每日的资金结果存入stock类中
+        stock.totalCashFlowIn=totalCashFlowIn
         if totalCashFlowIn<10000000:
             print('流入资金不足1000万')
             return 0
@@ -341,6 +350,11 @@ class Recognition:
     #EMA均线的圆形底
     def EMA5BottomArc(self,stock):
         print('开始识别弧形底部')
+        #流入资金500万的阈值,这里只针对HK股票
+
+        if stock.market=='HKEX' and stock.totalCashFlowIn<3000000:
+            return 0
+
         #这里先锁死5个值
         type='5'
         if type != '3' and type != '5':
@@ -379,7 +393,66 @@ class Recognition:
 
             print("不是弧形底")
             return 0
+#################################################识别下降类的程序##################################################
+    #识别弧形顶
+    def EMA5TOPArc(self,stock):
+        print('开始识别弧形底部')
 
+        # 这里先锁死5个值
+        type = '5'
+        if type != '3' and type != '5':
+            print('type 错误')
+            return 0
+
+        if type == '5':
+            # 5个值
+            data = stock.EMAData['EMA5']
+            arr = np.zeros(5)
+            for i in range(0, 5):
+                # 取最后5个
+                arr[i] = stock.EMAData['EMA5'].iloc[i - 5]
+            posMax = np.argmax(arr)
+            if posMax == 2:
+                if arr[1] > arr[0] and arr[3] > arr[4]:
+                    print("弧形顶")
+                    return 1
+            if posMax == 3:
+                if arr[1] > arr[0] and arr[2] > arr[1]:
+                    print("弧形顶")
+                    return 1
+            print("不是弧形顶")
+            return 0
+
+        if type == '3':
+            # 3个值
+            data = stock.EMAData['EMA5']
+            arr = np.array()
+            for i in range(0, 3):
+                arr[i] = stock.EMAData['EMA5'].iloc[i - 3]
+            posMax = np.argmax(arr)
+            if posMax == 1:
+                print("弧形顶")
+                return 1
+
+            print("不是弧形顶")
+            return 0
+
+ # 识别顶部的均线下穿
+    def EMADownCross(self, stock):
+        print(f'{stock.code}开始均线死叉识别顶部')
+        trendlist = self.RecognizeTrend(stock)  # 判断下降趋势，
+        lastTrend = trendlist[-1]
+        databuff = stock.dayPriceData['CLOSE']
+        closePirce = databuff.iloc[-1]  # 取最后一个
+        if lastTrend.Direction == 'down':
+            print('不是上升趋势')
+            return 0
+        else:
+            if (stock.EMAData['EMA5'].iloc[-1] - stock.EMAData['EMA10'].iloc[-1]<0) and (stock.EMAData['EMA5'].iloc[-3] - stock.EMAData['EMA10'].iloc[-3]>0):
+                print(f"{stock.code}底部5日10日均线死叉")
+                return 1
+            else:
+                return 0
 
 #预留的以后用来计算技术指标的类
 class TechIndex():

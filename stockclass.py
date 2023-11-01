@@ -20,13 +20,14 @@ class StockClass:
     trendList= []
     startDate = datetime.date(1970,1,1) #这里默认给一个起始时间和结束时间
     endDate = datetime.date(1970,1,2)
-
+    totalCashFlowIn=0
+    market=''
     #def __init__(self, code,dayPriceDataFrame,emaDataFrame):  # 从数据库中取出的是一个dataframe
     #不接受输入的初始化函数
     def __init__(self):
         pass
 
-    def __init__(self, code, dayPriceDataFrame,emaData):  # 从数据库中取出的是一个dataframe
+    def __init__(self, code, dayPriceDataFrame,emaData,market):  # 从数据库中取出的是一个dataframe
         self.code = code
         self.trendList = [Trend]
         self.EMAData1 = emaData
@@ -36,7 +37,7 @@ class StockClass:
         #############################获取时间########################
         self.startDate = self.dayPriceData['DATE'].iloc[0]
         self.endDate = self.dayPriceData['DATE'].iloc[-1]
-
+        self.market=market
         '''
         暂时先不用ema跑流程
         # 更新EMA数据

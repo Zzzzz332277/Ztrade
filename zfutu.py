@@ -1,3 +1,5 @@
+import time
+
 import futu as ft
 from futu import *
 
@@ -27,11 +29,12 @@ def CodeTransWind2FUTU(code):
 class Zfutu():
     def __init__(self,market):
         self.market=market
-        self.recogList = ['backstepema', 'EMAUpCross', 'MoneyFlow', 'EMA5BottomArc']
+        #ema diffusion先不做
+        self.recogList = ['backstepema', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
         if market=='HK':
-            self.listNameList=['backstepemaHK', 'EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK']
+            self.listNameList=['backstepemaHK', 'EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK','EMA5TOPArcHK','EMADownCrossHK']
         elif market=='US':
-            self.listNameList= ['backstepemaUS', 'EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS']
+            self.listNameList= ['backstepemaUS', 'EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS','EMA5TOPArcUS','EMADownCrossUS']
         else:
             print('市场输入错误')
             return
@@ -54,6 +57,9 @@ class Zfutu():
 
         ##################################################先讲原先的list清除########################
         self.CleanOutFUTUList(self.listNameList)
+        print('等待30S，防止调用futu接口过于频繁')
+        time.sleep(30)
+
         #将resulttable中的结果按识别内容分类，并清除为0的行
         for index,recogName in enumerate(self.recogList):
             resultTableSliced=resultTable[['code',recogName]]
@@ -61,9 +67,9 @@ class Zfutu():
             codeList=resultTableSliced['code'].tolist()
             codelistNew=self.CodeTransferWind2FUTU(codeList)
             self.AddFutuList(listname=self.listNameList[index],list=codelistNew)
-            time.sleep(0.1)
+            time.sleep(1)
+            #这里加入等待避免超出接口限制
         ###################################再恢复每日关注的股票#####################################
-        time.sleep(1)
         self.AddFutuList(listname='每日关注', list=codeListEveryDayWatch)
 
     #将wind的代码与富途进行转化
@@ -79,17 +85,17 @@ class Zfutu():
         return codelistNew
 
     def CleanOutFUTUList(self,listnamelist):
+        codeListMoveOut=[]
         #需要将代码在wind和futu间转换
         for list in listnamelist:
             ret, data = quote_ctx.get_user_security(list)
             if ret == RET_OK:
-                pass
+                codeListMoveOut=data['code'].tolist()
                 # print(data)  # 返回 success
             else:
                 print('error:', data)
-            codeListMoveOut = data['code'].tolist()
 
-            # 挨个清空自选
+            # 清空所有自选
             ret, data = quote_ctx.modify_user_security(list, ModifyUserSecurityOp.DEL, codeListMoveOut)
             if ret == RET_OK:
                 print(data)  # 返回 success
