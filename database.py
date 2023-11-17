@@ -14,6 +14,11 @@ import myexception
 import time
 import basic
 import database
+from futu import *
+import futu as ft
+import zfutu
+
+
 # 数据库的地址:HK市場
 DataBaseAddr = {'hostNAME': '127.0.0.1',
                 'PORT': '3306',
@@ -110,6 +115,18 @@ class KDJ(Base):
     D = Column(Float)
     J = Column(Float)
 
+#rsi的处理比较特殊，因为和EMA一样涉及到过往数据的均线计算，所以将中间过程UP/DOWN SMA存储下来
+class RSI(Base):
+    __tablename__ = 'RSI'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+
+    #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATE= Column(Date)
+    UPSMA= Column(Float)
+    DOWNSMA= Column(Float)
+    PERIOD= Column(Integer)
+
 class CodeDateIndex(Base):
     __tablename__ = 'CodeDateIndex'
     ID = Column(Integer, primary_key=True)
@@ -126,6 +143,17 @@ class TechDateIndex(Base):
     ENDDATE = Column(Date)
     TECHINDEXTYPE = Column(String(60))
 
+class CapitalFlow(Base):
+    __tablename__ = 'CapitalFlow'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+
+    #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATE= Column(Date)
+    Super_In_FLow= Column(Float)
+    Big_In_FLow= Column(Float)
+    Mid_In_FLow= Column(Float)
+    Sml_In_FLow= Column(Float)
 
 ####################################创建表格###############################################################
 Base.metadata.create_all(engine)
@@ -200,11 +228,38 @@ class GetWindDaTA:
                 raise myexception.ExceptionWindNoData('CWSDService: No data.')
             data = pd.DataFrame(buffData.Data, index=buffData.Fields)
             data = data.T
+            #检查数据是否有nan，防止nan进入数据库
+            if self.CheckDataHasNan(data):
+                print('数据中含有nan，无法使用')
+                continue
             data['DATE'] = buffData.Times
             data['CODE'] = code
             data.to_sql(name=tableName, con=self.engine,if_exists="append",index=False)
             self.con.commit()
 
+    #获取给定单一code的数据，成功返回1，失败返回0
+    def UpdateTimePeriodDataSingle(self, code, startDate, endDate, tableName):
+        statrTimeStr = startDate.strftime("%Y%m%d")
+        endTimeStr = endDate.strftime("%Y%m%d")
+        w.start()
+
+        buffData = w.wsd(code, tableKeyWordForWind[tableName], statrTimeStr, endTimeStr,
+                         f"TradingCalendar={self.tradingCalendar};PriceAdj=F")
+        print(f"获取{code}的日线数据")
+        if buffData.Data[0][0] == 'CWSDService: No data.':
+            # 抛出无数据的异常
+            raise myexception.ExceptionWindNoData('CWSDService: No data.')
+        data = pd.DataFrame(buffData.Data, index=buffData.Fields)
+        data = data.T
+        # 检查数据是否有nan，防止nan进入数据库
+        if self.CheckDataHasNan(data):
+            print('数据中含有nan，无法使用')
+            return 0
+        data['DATE'] = buffData.Times
+        data['CODE'] = code
+        data.to_sql(name=tableName, con=self.engine, if_exists="append", index=False)
+        self.con.commit()
+        return 1
 
     #获取EMA数据并写入数据库
     def UpdateTimePeriodDataEMA(self, codelist, startDate, endDate,tableName):
@@ -221,6 +276,10 @@ class GetWindDaTA:
                 print(f"获取{code}的{period}ema数据")
                 data = pd.DataFrame(buffData.Data, index=buffData.Fields)
                 data = data.T
+                # 检查数据是否有nan，防止nan进入数据库
+                if self.CheckDataHasNan(data):
+                    print('数据中含有nan，无法使用')
+                    continue
                 data['DATE'] = buffData.Times
                 data['CODE'] = code
                 data['PERIOD'] = period
@@ -251,6 +310,10 @@ class GetWindDaTA:
                 print(f"获取{code}的KDJ的{type}数据")
                 data = pd.DataFrame(buffData.Data, index=buffData.Fields)
                 data = data.T
+                # 检查数据是否有nan，防止nan进入数据库
+                if self.CheckDataHasNan(data):
+                    print('数据中含有nan，无法使用')
+                    continue
                 data['DATE'] = buffData.Times
                 data['CODE'] = code
                 data['TYPE'] = type
@@ -262,6 +325,36 @@ class GetWindDaTA:
         print("开始写入数据库")
         concatDataframe.to_sql(name=tableName, con=self.engine, if_exists="append", index=False)
         self.con.commit()
+
+    # 获取给定单一code的CapitialFLow数据，保存入数据库,适用于futu平台
+    def UpdateTimePeriodCapitalSingle(self, code, startDate, endDate, tableName):
+        codeList=[]
+        codeList.append(code)
+        codeListNew=self.CodeTransferWind2FUTU(codeList)
+        codeNew=codeListNew[0]
+        statrTimeStr = startDate.strftime("%Y-%m-%d")
+        endTimeStr = endDate.strftime("%Y-%m-%d")
+        #从富途获取数据
+        ret, data = zfutu.quote_ctx.get_capital_flow(codeNew, period_type = PeriodType.DAY,start=statrTimeStr,end=endTimeStr)
+        #休息1s，避免超出30S30次的限制
+        time.sleep(1)
+        if ret == RET_OK:
+            print(f"获取{code}的资金流数据")
+        else:
+            print('error:', data)
+            return 0
+
+        buffData=data.loc[:,['super_in_flow','big_in_flow','mid_in_flow','sml_in_flow']]
+        buffData['CODE']=code
+        buffData['DATE']=data['capital_flow_item_time']
+
+        # 检查数据是否有nan，防止nan进入数据库
+        if self.CheckDataHasNan(buffData):
+            print('数据中含有nan，无法使用')
+            return 0
+        buffData.to_sql(name=tableName, con=self.engine, if_exists="append", index=False)
+        self.con.commit()
+        return 1
 
     ###################################这两个程序是只返回dataframe，不存储##########################################
     def GetTimePeriodData(self, codelist, startDate, endDate):
@@ -279,6 +372,10 @@ class GetWindDaTA:
             # 这里取出的是没有时间的。
             data = pd.DataFrame(buffData.Data, index=buffData.Fields)
             data = data.T
+            # 检查数据是否有nan，防止nan进入数据库
+            if self.CheckDataHasNan(data):
+                print('数据中含有nan，无法使用')
+                continue
             data['DATE'] = buffData.Times
             data['CODE'] = code
             concatDataframe = pd.concat([concatDataframe,data])
@@ -302,6 +399,10 @@ class GetWindDaTA:
                 print(f"获取{code}的{period}ema数据")
                 data = pd.DataFrame(buffData.Data, index=buffData.Fields)
                 data = data.T
+                # 检查数据是否有nan，防止nan进入数据库
+                if self.CheckDataHasNan(data):
+                    print('数据中含有nan，无法使用')
+                    continue
                 data['DATE'] = buffData.Times
                 data['CODE'] = code
                 data['PERIOD'] = period
@@ -324,6 +425,10 @@ class GetWindDaTA:
         # 这里取出的是没有时间的。
         data = pd.DataFrame(buffData.Data, index=buffData.Fields)
         data = data.T
+        # 检查数据是否有nan，防止nan进入数据库
+        if self.CheckDataHasNan(data):
+            print('数据中含有nan，无法使用')
+            return
         for i in range(0, len(codelist) - 1):
             buffRow = data.iloc[[i]]
             buffRow['DATE'] = today
@@ -356,6 +461,10 @@ class GetWindDaTA:
                 buffData = w.wsd(code, tableKeyWordForWind[tableName], startDateStr, todayStr,f"TradingCalendar={self.tradingCalendar};PriceAdj=F")
                 data = pd.DataFrame(buffData.Data, index=buffData.Fields)
                 data = data.T
+                # 检查数据是否有nan，防止nan进入数据库
+                if self.CheckDataHasNan(data):
+                    print('数据中含有nan，无法使用')
+                    continue
                 data['DATE'] = buffData.Times
                 data['CODE'] = code
                 data.to_sql(name=tableName,con=self.engine,if_exists="append",index=False)
@@ -389,6 +498,10 @@ class GetWindDaTA:
                     # 这里取出的是没有时间的。
                     data = pd.DataFrame(buffData.Data, index=buffData.Fields)
                     data = data.T
+                    # 检查数据是否有nan，防止nan进入数据库
+                    if self.CheckDataHasNan(data):
+                        print('数据中含有nan，无法使用')
+                        continue
                     data['DATE'] = buffData.Times
                     data['CODE'] = code
                     data['PERIOD'] = period
@@ -527,17 +640,16 @@ class GetWindDaTA:
         oneDay=timedelta(days=1)
         #需要将单个的code转化为codelist，满足update函数的运行条件
         for code in codeList:
-            codeListBuff = []
-            codeListBuff.append(code)
+
             codeResult = self.session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).all()
             if len(codeResult) == 0:
                 print(f'表中无该{code}数据,开始获取新数据')
                 try:
-                    self.UpdateTimePeriodData(codelist=codeListBuff, startDate=startdate, endDate=enddate, tableName='daypricedata')
+                    result=self.UpdateTimePeriodDataSingle(code=code, startDate=startdate, endDate=enddate, tableName='daypricedata')
                 except myexception.ExceptionWindNoData as e:
                     print("非交易日，无数据")
                     continue
-                self.UpdateCodeIndex(code,startdate, enddate,self.session)
+                if result: self.UpdateCodeIndex(code,startdate, enddate,self.session)
                 continue
 
             # code在表中存在的情况下，在表中获取startdate和enddate
@@ -547,16 +659,18 @@ class GetWindDaTA:
             # 还有一种情况是需要获取的数据范围包裹住了数据库内的数据范围
             if startdate < dbStartDate and enddate > dbEndDate:
                 print('前后方数据都需要补充')
-                # 补充前方数据
+                # 补充前方数据并更新前方index
                 startdatebuff = startdate
                 endDatebuff = dbStartDate - oneDay
-                self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
-                # 补充后方数据
+                result=self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff, 'daypricedata')
+                if result: self.UpdateCodeIndex(code,startdate, dbEndDate,self.session)
+
+                # 补充后方数据并更新后方index
                 startdatebuff = dbEndDate + oneDay
                 endDatebuff = enddate
-                self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+                result=self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff, 'daypricedata')
                 # 这里边界以startdate和enddate为准
-                self.UpdateCodeIndex(code, startdate, enddate,self.session)
+                if result:self.UpdateCodeIndex(code, startdate, enddate,self.session)
                 continue
 
             if (startdate>=dbEndDate or enddate<=dbStartDate) and startdate!=enddate:
@@ -595,11 +709,89 @@ class GetWindDaTA:
                             dbEndDateBuff = dbEndDate
             #根据日期情况鞥新数据
             try:
-                self.UpdateTimePeriodData(codeListBuff, startdatebuff, endDatebuff, 'daypricedata')
+                result=self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff, 'daypricedata')
             except myexception.ExceptionWindNoData as e:
                 print("非交易日，无数据")
                 continue
-            self.UpdateCodeIndex(code, dbStartDateBuff, dbEndDateBuff,self.session)
+            if result:self.UpdateCodeIndex(code, dbStartDateBuff, dbEndDateBuff,self.session)
+
+    def SyncDataBaseCapitalFLow(self, codeList, startdate, enddate,tablename):
+        oneDay=timedelta(days=1)
+        #需要将单个的code转化为codelist，满足update函数的运行条件
+        for code in codeList:
+
+            CapFlowIndex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'CapitalFlow').first()
+            if CapFlowIndex == None:
+                print(f'表中无该{code}数据,开始获取新数据')
+                try:
+                    result=self.UpdateTimePeriodCapitalSingle(code=code, startDate=startdate, endDate=enddate, tableName='capitalflow')
+                except myexception.ExceptionWindNoData as e:
+                    print("非交易日，无数据")
+                    continue
+                if result: self.UpdateTechIndex(code,startdate, enddate,self.session,'capitalflow')
+                continue
+
+            # code在表中存在的情况下，在表中获取startdate和enddate
+            dbStartDate = CapFlowIndex.STARTDATE
+            dbEndDate = CapFlowIndex.ENDDATE
+            # 还有一种情况是需要获取的数据范围包裹住了数据库内的数据范围
+            if startdate < dbStartDate and enddate > dbEndDate:
+                print('前后方数据都需要补充')
+                # 补充前方数据并更新前方index
+                startdatebuff = startdate
+                endDatebuff = dbStartDate - oneDay
+                result=self.UpdateTimePeriodCapitalSingle(code, startdatebuff, endDatebuff, 'capitalflow')
+                if result: self.UpdateTechIndex(code,startdate, dbEndDate,self.session, 'capitalflow')
+
+                # 补充后方数据并更新后方index
+                startdatebuff = dbEndDate + oneDay
+                endDatebuff = enddate
+                result=self.UpdateTimePeriodCapitalSingle(code, startdatebuff, endDatebuff, 'capitalflow')
+                # 这里边界以startdate和enddate为准
+                if result:self.UpdateTechIndex(code, startdate, enddate,self.session,'capitalflow')
+                continue
+
+            if (startdate>=dbEndDate or enddate<=dbStartDate) and startdate!=enddate:
+                #说明数据库中的时间范围和目标时间范围不重叠，中间的空隙需要补上，否则整个逻辑会失效
+                if startdate>=dbEndDate:
+                    print('数据在后方有空隙，进行填补')
+                    startdatebuff = dbEndDate+oneDay
+                    endDatebuff = enddate
+                    dbStartDateBuff=dbStartDate
+                    dbEndDateBuff=endDatebuff
+                else:
+                    print('数据在前方有空隙，进行填补')
+                    startdatebuff = startdate
+                    endDatebuff = dbStartDate-oneDay
+                    dbStartDateBuff = startdatebuff
+                    dbEndDateBuff = dbEndDate
+            else:
+                if startdate>=dbStartDate and enddate<=dbEndDate:
+                    #说明日期在包裹之内，不用重新获取
+                    print('已有数据，不用获取')
+                    continue
+                else:
+                    if startdate>=dbStartDate and enddate>dbEndDate:
+                        print('补充后方数据')
+                        #说明只需要获取后面一部分的数据
+                        startdatebuff = dbEndDate+oneDay
+                        endDatebuff = enddate
+                        dbStartDateBuff = dbStartDate
+                        dbEndDateBuff = endDatebuff
+                    else:
+                        if startdate<dbStartDate and enddate<=dbEndDate:
+                            print('补充前方数据')
+                            startdatebuff = startdate
+                            endDatebuff=dbStartDate-oneDay
+                            dbStartDateBuff = startdatebuff
+                            dbEndDateBuff = dbEndDate
+            #根据日期情况鞥新数据
+            try:
+                result=self.UpdateTimePeriodCapitalSingle(code, startdatebuff, endDatebuff, 'capitalflow')
+            except myexception.ExceptionWindNoData as e:
+                print("非交易日，无数据")
+                continue
+            if result:self.UpdateTechIndex(code, dbStartDateBuff, dbEndDateBuff,self.session,'capitalflow')
 
     #用来同步数据库中的数据时间的函数
     def UpdateCodeIndex(self,code,startDate,endDate,session):
@@ -611,6 +803,43 @@ class GetWindDaTA:
         else:
             session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).update({"STARTDATE": startDate, "ENDDATE": endDate})
         session.commit()
+
+    def CheckDataHasNan(self,dataframe):
+        check_for_nan = dataframe.isnull().values.any()
+        if check_for_nan==True:
+            return 1
+        else:
+            return 0
+
+    #用来进行code的函数
+    def CodeTransferWind2FUTU(self, codelist):
+        codelistNew = list()
+        for code in codelist:
+            codebuff = code.split('.')
+            if self.tradingCalendar == 'HKEX':
+                codeNew = codebuff[1] + '.' + '0' + codebuff[0]
+            elif self.tradingCalendar == 'NYSE':
+                codeNew = 'US' + '.' + codebuff[0]
+            codelistNew.append(codeNew)
+        return codelistNew
+
+    #升级techindex的函数
+    def UpdateTechIndex(self, code, startDate, endDate, session, techIndexType):
+        queryResult = session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,
+                                                                   database.TechDateIndex.TECHINDEXTYPE == techIndexType).all()
+        if len(queryResult) == 0:
+            codeDateIndexbuff = database.TechDateIndex(CODE=code, STARTDATE=startDate, ENDDATE=endDate,
+                                                       TECHINDEXTYPE=techIndexType)
+            session.add(codeDateIndexbuff)
+        else:
+            session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,
+                                                         database.TechDateIndex.TECHINDEXTYPE == techIndexType).update(
+                {"STARTDATE": startDate, "ENDDATE": endDate, "TECHINDEXTYPE": techIndexType})
+        session.commit()
+
+    #用于对数据库进行维护的函数，确保无重复，无nan和0数据
+    def DatabaseMainten(self):
+        pass
 
 class DataPrepare():
 
@@ -627,7 +856,7 @@ class DataPrepare():
         gwd = GetWindDaTA(self.con,self.engine,self.session,self.tradingCalendar)
         print('同步数据库')
         gwd.SyncDateBaseDayPirceData(codelist, startdate, endate, 'codedateindex')
-
+        #gwd.SyncDataBaseCapitalFLow(codelist, startdate, endate, 'capitalflow')
         #计算ema数据和kdj数据
         tix=recognition.TechIndex(self.con,self.engine,self.session,self.tradingCalendar)
         print('计算技术指标')

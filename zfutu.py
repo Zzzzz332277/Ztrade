@@ -26,15 +26,16 @@ def CodeTransWind2FUTU(code):
     codeNew = codebuff[1] + '.' + '0' + codebuff[0]
     return codeNew
 
+
 class Zfutu():
     def __init__(self,market):
         self.market=market
         #ema diffusion先不做
-        self.recogList = ['backstepema', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
+        self.recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
         if market=='HK':
-            self.listNameList=['backstepemaHK', 'EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK','EMA5TOPArcHK','EMADownCrossHK']
+            self.listNameList=['backstepemaHK', 'EmaDiffusionHK','EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK','EMA5TOPArcHK','EMADownCrossHK']
         elif market=='US':
-            self.listNameList= ['backstepemaUS', 'EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS','EMA5TOPArcUS','EMADownCrossUS']
+            self.listNameList= ['backstepemaUS', 'EmaDiffusionUS','EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS','EMA5TOPArcUS','EMADownCrossUS']
         else:
             print('市场输入错误')
             return
@@ -44,10 +45,17 @@ class Zfutu():
 
     def ModifyFutuStockList(self,resultTable):
         codelist=list()
-        #listNameList= ['backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc']
-        #去除emaDiffusion，减少接口调用次数
         #########################这里需要注意，对每日关注的列表进行保留操作，以免删除ztrade时候也删除了自选股###########################################
-        ret, everyDayWatchData = quote_ctx.get_user_security('每日关注')
+
+        if self.market=='HK':
+            watchList='每日关注'
+        elif self.market=='US':
+            watchList='美股关注'
+        else:
+            print('市场输入错误')
+            return
+
+        ret, everyDayWatchData = quote_ctx.get_user_security(watchList)
         if ret == RET_OK:
             pass
             # print(data)  # 返回 success
@@ -70,7 +78,7 @@ class Zfutu():
             time.sleep(1)
             #这里加入等待避免超出接口限制
         ###################################再恢复每日关注的股票#####################################
-        self.AddFutuList(listname='每日关注', list=codeListEveryDayWatch)
+        self.AddFutuList(listname=watchList, list=codeListEveryDayWatch)
 
     #将wind的代码与富途进行转化
     def CodeTransferWind2FUTU(self,codelist):

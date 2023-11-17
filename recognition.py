@@ -14,12 +14,16 @@ from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float
 import basic
 import zfutu
 from futu import *
+import crawler
 ##################################测试使用pandas ewm计算ema#########################
 '''
 sql = f'select * from daypricedata where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-10-17"'
 outData = pd.DataFrame()
 outData = pd.read_sql(text(sql), con=database.con)
-outDataClose = outData['CLOSE']
+outDataClose = outData['CLOSE'].tolist()
+tic=recognition.TechIndex()
+
+
 ema_10 = np.array(outDataClose.ewm(span=20, min_periods=0, adjust=False, ignore_na=False).mean())
 sql1EMA = f'select * from expma where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-10-11"'
 outDataEMA = pd.read_sql(text(sql1EMA), con=database.con)
@@ -30,7 +34,6 @@ pass
 '''
 
 # gwd.UpdateTimePeriodDataKDJ(codeList, startDate, endDate, 'kdj')
-# tic=recognition.TechIndex()
 # tic.CalcKDJ(codeList,database.session,database.con)
 
 
@@ -79,31 +82,7 @@ class Recognition:
                 print("运行时间：" + str((t2 - t1) / 1000000) + "秒")
 
 
-    def EmaDiffusion(self, stock):
-        print(f"开始识别均线发散：{stock.code}")
-        # 根据上下关系判断，均线的顺序也是从上到下降低,5条均线
-        if stock.EMAData['EMA5'].iloc[-1]>stock.EMAData['EMA10'].iloc[-1]:
-            if stock.EMAData['EMA10'].iloc[-1]>stock.EMAData['EMA20'].iloc[-1]:
-                if stock.EMAData['EMA20'].iloc[-1]>stock.EMAData['EMA30'].iloc[-1]:
-                    if stock.EMAData['EMA30'].iloc[-1]>stock.EMAData['EMA60'].iloc[-1]:
-                        print(f"{stock.code}均线发散")
-                        return 1
 
-
-        print(f"{stock.code}均线不发散")
-        return 0
-        '''
-        if self.RelativeRelationofTwoLine(stock.EMAData['EMA5'], stock.EMAData['EMA10']) == '1up2':
-            if self.RelativeRelationofTwoLine(stock.EMAData['EMA10'], stock.EMAData['EMA20']) == '1up2':
-                if self.RelativeRelationofTwoLine(stock.EMAData['EMA20'], stock.EMAData['EMA30']) == '1up2':
-                    if self.RelativeRelationofTwoLine(stock.EMAData['EMA30'], stock.EMAData['EMA60']) == '1up2':
-
-                        print(f"{stock.code}均线发散")
-                        return 1
-        else:
-            print(f"{stock.code}均线不发散")
-            return 0
-        '''
     # 对组件进行逻辑定义，类下有没有更小的类
     def RelativeRelationofTwoLine(self, line1, line2):
         if len(line1) != len(line2):
@@ -259,6 +238,42 @@ class Recognition:
             return 0
         # 返回回踩的均线的值，返回状态是否均线回踩
 
+    def EmaDiffusion(self, stock):
+        print(f"开始识别均线发散：{stock.code}")
+        # 根据上下关系判断，均线的顺序也是从上到下降低,4条均线
+        # 加入内外盘筛选的阈值，目前只针对香港
+        if stock.market == 'HKEX':
+            sellBid, buyBid, turnOverRate = crawler.GetEastMoneyData(stock.code)
+            if sellBid > buyBid:
+                return 0
+
+        if stock.EMAData['EMA5'].iloc[-1] > stock.EMAData['EMA10'].iloc[-1]:
+            if stock.EMAData['EMA10'].iloc[-1] > stock.EMAData['EMA20'].iloc[-1]:
+                if stock.EMAData['EMA20'].iloc[-1] > stock.EMAData['EMA30'].iloc[-1]:
+                    # 再判断各个均线是否是扩散状态的
+                    EMA5difussion = stock.EMAData['EMA5'].iloc[-1] > stock.EMAData['EMA5'].iloc[-2] and stock.EMAData['EMA5'].iloc[-2] > stock.EMAData['EMA5'].iloc[-3]
+                    EMA10difussion = stock.EMAData['EMA10'].iloc[-1] > stock.EMAData['EMA10'].iloc[-2] and stock.EMAData['EMA10'].iloc[-2] > stock.EMAData['EMA10'].iloc[-3]
+                    EMA20difussion = stock.EMAData['EMA20'].iloc[-1] > stock.EMAData['EMA20'].iloc[-2] and stock.EMAData['EMA20'].iloc[-2] > stock.EMAData['EMA20'].iloc[-3]
+                    EMA30difussion = stock.EMAData['EMA30'].iloc[-1] > stock.EMAData['EMA30'].iloc[-2] and stock.EMAData['EMA30'].iloc[-2] > stock.EMAData['EMA30'].iloc[-3]
+                    EMA60difussion = stock.EMAData['EMA60'].iloc[-1] > stock.EMAData['EMA60'].iloc[-2] and stock.EMAData['EMA60'].iloc[-2] > stock.EMAData['EMA60'].iloc[-3]
+                    if (EMA5difussion and EMA10difussion and EMA20difussion and EMA30difussion and EMA60difussion):
+                        print(f"{stock.code}均线发散")
+                        return 1
+
+        print(f"{stock.code}均线不发散")
+        return 0
+        '''
+        if self.RelativeRelationofTwoLine(stock.EMAData['EMA5'], stock.EMAData['EMA10']) == '1up2':
+            if self.RelativeRelationofTwoLine(stock.EMAData['EMA10'], stock.EMAData['EMA20']) == '1up2':
+                if self.RelativeRelationofTwoLine(stock.EMAData['EMA20'], stock.EMAData['EMA30']) == '1up2':
+                    if self.RelativeRelationofTwoLine(stock.EMAData['EMA30'], stock.EMAData['EMA60']) == '1up2':
+
+                        print(f"{stock.code}均线发散")
+                        return 1
+        else:
+            print(f"{stock.code}均线不发散")
+            return 0
+        '''
     # 抄底
     def EMAUpCross(self, stock):
         print(f'{stock.code}开始均线金叉识别底部')
@@ -336,6 +351,9 @@ class Recognition:
         totalCashFlowIn=cashFLowSup+cashFLowBig+cashFLowMid+cashFLowSmall
         #将每日的资金结果存入stock类中
         stock.totalCashFlowIn=totalCashFlowIn
+        stock.superCashFlowIn=cashFLowSup
+        stock.bigCashFlowIn=cashFLowBig
+
         if totalCashFlowIn<10000000:
             print('流入资金不足1000万')
             return 0
@@ -350,12 +368,33 @@ class Recognition:
     #EMA均线的圆形底
     def EMA5BottomArc(self,stock):
         print('开始识别弧形底部')
-        #流入资金500万的阈值,这里只针对HK股票
 
-        if stock.market=='HKEX' and stock.totalCashFlowIn<3000000:
+        if stock.market=='HKEX':
+            # 流入资金100万的阈值,这里只针对HK股票
+            if stock.totalCashFlowIn<1000000:
+                return 0
+            # 加入一个资金流入的筛选判断
+            #if stock.superCashFlowIn < 0 or stock.bigCashFlowIn < 0:
+                #return 0
+
+        #对于最后一条K线的判断
+        lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+        lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+        lastHigh = stock.dayPriceData['HIGH'].iloc[-1]
+        lastLow = stock.dayPriceData['LOW'].iloc[-1]
+
+        #是阴线
+        if lastClose<lastOpen:
+            return 0
+        #上下影线计算，到这步直接是阳线
+        upShadowLen=abs(lastHigh-lastClose)
+        downShadowLen=abs(lastLow-lastOpen)
+        candleLen=abs(lastOpen-lastClose)
+        #上影线不能超过1/2长度
+        if upShadowLen>(candleLen/2):
             return 0
 
-        #这里先锁死5个值
+
         type='5'
         if type != '3' and type != '5':
             print('type 错误')
@@ -454,6 +493,15 @@ class Recognition:
             else:
                 return 0
 
+class MainIndexAnalysis():
+    def __init__(self):
+        pass
+
+    def SyncMainIndexData(self):
+        pass
+
+
+
 #预留的以后用来计算技术指标的类
 class TechIndex():
     def __init__(self, con, engine, session, tradingcalendar):
@@ -489,6 +537,10 @@ class TechIndex():
                     print('数据不足，无法进行计算求取数据')
                     continue
                 # KDJ 值对应的函数是 STOCH
+                # 检查输入的pdf是否有nan
+                if self.CheckDataHasNan(outData):
+                    print("数据中有nan，不完整，无法计算")
+                    continue
                 KDJResult=self.CalKDJTalib(outData,code)
                 KDJResult.to_sql(name='kdj', con=self.engine, if_exists="append", index=False)
                 self.con.commit()
@@ -525,6 +577,10 @@ class TechIndex():
 
                 outDataBuff=outData
                 KDJResult = pd.DataFrame()
+                # 检查输入的pdf是否有nan
+                if self.CheckDataHasNan(outDataBuff):
+                    print("数据中有nan，不完整，无法计算")
+                    continue
                 KDJResult=self.CalKDJTalib(outDataBuff,code)
                 KDJResultSlice=KDJResult[posStartSlice:-1]
                 KDJResultSlice.to_sql(name='kdj', con=self.engine, if_exists="append", index=False)
@@ -624,6 +680,8 @@ class TechIndex():
             self.con.commit()
             self.UpdateTechIndex(self.session,code,EMAIndexStartDate,EmaCalEndDate,'ema')
 
+
+
     def CalSingleEMA(self,list,period,prevalue):
         data = [0 for _ in range(len(list))]
         α=2/(period+1)
@@ -633,6 +691,160 @@ class TechIndex():
             else:
                 data[i] = α * list[i] + (1 - α) * data[i - 1]
         return data# 从首开始循环
+
+    def CalAllRSI(self,codelist):
+        for code in codelist:
+            print(f'计算{code} RSI')
+            # code在表中存在的情况下，在表中获取startdate和enddate
+            RSIindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,
+                                                                         database.TechDateIndex.TECHINDEXTYPE == 'RSI').first()
+            dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+            if dayPriceDataIndex == None:
+                print(f'{code}没有日线数据,无法计算')
+                continue
+            if RSIindex != None and RSIindex.ENDDATE == dayPriceDataIndex.ENDDATE:
+                print(f'{code}已有RSI数据，不用计算')
+                continue
+
+            if RSIindex == None:
+                #说明里面没有数据，直接取所有daypricedata进行计算，并更新index
+                dbStartDate = dayPriceDataIndex.STARTDATE
+                dbEndDate = dayPriceDataIndex.ENDDATE
+                startDateStr = dbStartDate.strftime('%Y-%m-%d')
+                endDateStr = dbEndDate.strftime('%Y-%m-%d')
+                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{startDateStr}" and "{endDateStr}"'
+                outData = pd.DataFrame()
+                outData = pd.read_sql(text(sql), con=self.con)
+                outData = outData.sort_values(by="DATE", ascending=True)
+
+                # 检查输入的pdf是否有nan
+                if self.CheckDataHasNan(outData):
+                    print("数据中有nan，不完整，无法计算")
+                    continue
+
+                periods=[6,12,24]
+                closeDataList = outData['CLOSE']
+                # 存储计算结果
+                SMACalResult = pd.DataFrame()
+                concatDataframe = pd.DataFrame(columns=["DATE", "CODE", 'UPSMA','DOWNSMA',"PERIOD"])
+                for period in periods:
+                    UPSMA,DOWNSMA = self.CalSingleRSI(closeDataList, period=period)
+                    #这里计算出来的upsma和downsma少一位，需要将date第一位去除
+                    dateSeris=outData['DATE']
+                    dateSeris=dateSeris.drop(0)
+                    SMACalResult['DATE'] = dateSeris
+                    SMACalResult['CODE'] = code
+                    SMACalResult['PERIOD'] = period
+                    SMACalResult['UPSMA'] = UPSMA
+                    SMACalResult['DOWNSMA']=DOWNSMA
+                    concatDataframe = pd.concat([concatDataframe, SMACalResult])
+
+                # 写入数据库,并更新index
+                concatDataframe.to_sql(name='rsi', con=self.engine, if_exists="append", index=False)
+                self.con.commit()
+                # 更新index的结果
+                #因为算出来比前面少一位，所以需要将起始位置减一天
+                RSIStartDate = dbStartDate+timedelta(days=1)
+
+                self.UpdateTechIndex(self.session,code,RSIStartDate,dbEndDate,'rsi')
+
+            #有日线数据也有RSI数据的情况下
+            else:
+                RSIIndexStartDate = RSIindex.STARTDATE
+                RSIIndexEndDate = RSIindex.ENDDATE
+                # 需要计算rsi的区间,要往前多取一天，把之前最后一天RSI对应的DAYPRICEDATA也取出来
+                RSICalStartDate = RSIIndexEndDate
+                RSICalEndDate = dayPriceDataIndex.ENDDATE
+                # 查询rsi取出前一个值并计算
+                periods=[6,12,24]
+                # 获取到各个周期第一个值后，获取darpricedata的值,并进行EMA的计算
+
+                RSICalStartDateStr = RSICalStartDate.strftime('%Y-%m-%d')
+                RSICalEndDateStr = RSICalEndDate.strftime('%Y-%m-%d')
+                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{RSICalStartDateStr}" and "{RSICalEndDateStr}"'
+                outData = pd.DataFrame()
+                outData = pd.read_sql(text(sql), con=self.con)
+                outData = outData.sort_values(by="DATE", ascending=True)
+                closeDataList = outData['CLOSE']
+                # 存储计算结果
+                SMACalResult = pd.DataFrame()
+                concatDataframe = pd.DataFrame(columns=["DATE", "CODE", 'UPSMA', 'DOWNSMA', "PERIOD"])
+                for period in periods:
+                    RSIFirst = self.session.query(database.RSI).filter(database.RSI.CODE == code,
+                                                                       database.RSI.DATE == RSIIndexEndDate,
+                                                                       database.RSI.PERIOD == period).first()
+                    UPSMAFirst=RSIFirst.UPSMA
+                    DOWNSMAFirst=RSIFirst.DOWNSMA
+                    UPSMA,DOWNSMA = self.CalSingleRSIIterate(price=closeDataList, period=period, upsma=UPSMAFirst,downsma=DOWNSMAFirst)
+                    dateSeris = outData['DATE']
+                    dateSeris = dateSeris.drop(0)
+                    SMACalResult['DATE'] = dateSeris
+                    SMACalResult['CODE'] = code
+                    SMACalResult['PERIOD'] = period
+                    SMACalResult['UPSMA'] = UPSMA
+                    SMACalResult['DOWNSMA'] = DOWNSMA
+                    concatDataframe = pd.concat([concatDataframe, SMACalResult])
+
+                    # 写入数据库,并更新index
+                concatDataframe.to_sql(name='rsi', con=self.engine, if_exists="append", index=False)
+                # pymysql更新后需要提交事务，避免查不到数据
+                self.con.commit()
+                self.UpdateTechIndex(self.session, code, RSIIndexStartDate, RSICalEndDate, 'rsi')
+
+    def CalSingleRSI(self,price, period):
+        #这里注意传进来的是series,list没有shift和index可用,因为是依次减去的关系，这里计算的rsi第一位没有
+        clprcChange = price - price.shift(1)
+        clprcChange = clprcChange.dropna()
+
+        indexprc = clprcChange.index
+        upPrc = pd.Series(0, index=indexprc)
+        upPrc[clprcChange > 0] = clprcChange[clprcChange > 0]
+
+        downPrc = pd.Series(0, index=indexprc)
+        downPrc[clprcChange < 0] = -clprcChange[clprcChange < 0]
+        risdata = pd.concat([price, clprcChange, upPrc, downPrc], axis=1)
+        risdata.columns = ['price', 'PrcChange', 'upPrc', 'downPrc']
+        risdata = risdata.dropna()
+        #SMUP = []
+        #SMDOWN = []
+        '''
+        for i in range(period, len(upPrc) + 1):
+            #这里有问题，算移动平均的时候，这里的SMA和同花顺的算法不一样
+            SMUP.append(np.mean(upPrc.values[(i - period): i], dtype=np.float32))
+            SMDOWN.append(np.mean(downPrc.values[(i - period): i], dtype=np.float32))
+        '''
+        SMUP=upPrc.ewm(alpha=1/period,adjust=False).mean()
+        SMDOWN=downPrc.ewm(alpha=1/period,adjust=False).mean()
+        #rsi = [100 * SMUP.iloc[i] / (SMUP.iloc[i] + SMDOWN.iloc[i]) for i in range(0, len(SMUP))]
+
+        #indexRsi = indexprc[(period - 1):]
+        #rsi = pd.Series(rsi, index=indexRsi)
+        return SMUP,SMDOWN
+
+    #通过迭代方法计算RSI
+    def CalSingleRSIIterate(self,price, period,upsma,downsma):
+        clprcChange = price - price.shift(1)
+        clprcChange = clprcChange.dropna()
+
+        indexprc = clprcChange.index
+        upPrc = pd.Series(0, index=indexprc)
+        upPrc[clprcChange > 0] = clprcChange[clprcChange > 0]
+
+        downPrc = pd.Series(0, index=indexprc)
+        downPrc[clprcChange < 0] = -clprcChange[clprcChange < 0]
+
+        upData = [0 for _ in range(len(upPrc))]
+        downData= [0 for _ in range(len(upPrc))]
+        α =1/(period)
+        for i in range(0, len(upPrc)):
+            if i == 0:
+                upData[i] = α * upPrc.iloc[i] + (1 - α) * upsma
+                downData[i]=α * downPrc.iloc[i] + (1 - α) * downsma
+            else:
+                upData[i] = α * upPrc.iloc[i] + (1 - α) * upData[i - 1]
+                downData[i]=α * downPrc.iloc[i] + (1 - α) * downData[i - 1]
+        return upData,downData  # 从首开始循环
+
 
 
     def UpdateTechIndex(self,session,code,startDate,endDate,techIndexType):
@@ -645,6 +857,12 @@ class TechIndex():
             session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE==techIndexType).update(
                 {"STARTDATE": startDate, "ENDDATE": endDate, "TECHINDEXTYPE": techIndexType})
         session.commit()
-            
+
+    def CheckDataHasNan(self,dataframe):
+        check_for_nan = dataframe.isnull().values.any()
+        if check_for_nan==True:
+            return 1
+        else:
+            return 0
 
 

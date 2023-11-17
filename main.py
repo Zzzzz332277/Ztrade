@@ -14,15 +14,34 @@ import recognition
 import stockclass
 from talib import EMA
 import zfutu
+from futu import *
 ################################################################################################
 # 程序开始的地方，后面需要加入__main__的判断
 ################################################################################################
 
 if __name__ == '__main__':
-    main.ZtradeHK()
-    #main.ZtradeUS()
+    '''
+    TradeCalendar = 'HKEX'
+    sql = f'select * from daypricedata where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-11-1"'
+    outData = pd.DataFrame()
+    outData = pd.read_sql(text(sql), con=database.con)
+    outDataClose = outData['CLOSE']
+    tic = recognition.TechIndex(database.con,database.engine,database.session,TradeCalendar)
+    tic.CalAllRSI(['0700.HK'])
+    '''
+    #main.ZtradeHK()
 
+    main.ZtradeUS()
 
+    #startDate = date(2023, 8, 1)
+    #endDate = date(2023, 11,16)
+
+    #TradeCalendar='HKEX'
+
+    #gwd=database.GetWindDaTA(database.con,database.engine,database.session,TradeCalendar)
+    #gwd.UpdateTimePeriodCapitalSingle('0700.HK',startDate,endDate,'capitalflow')
+
+    pass
 
 def ZtradeHK():
     # f= open(, encoding="utf-8")
@@ -32,7 +51,7 @@ def ZtradeHK():
     codeList = codeDF['WindCodes'].tolist()
 
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 10, 31)
+    endDate = date(2023, 11, 17)
 
     #codeList=['0001.HK']
 
@@ -56,7 +75,7 @@ def ZtradeUS():
     codeList = codeDF['WindCodes'].tolist()
 
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 10, 30)
+    endDate = date(2023, 11, 17)
 
     #codeList=['AAPL.O']
 
