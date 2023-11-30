@@ -14,18 +14,7 @@ class Trend:
 
 # 适用于wind数据的candle
 class StockClass:
-    code = ''
-    dayPriceData = pd.DataFrame()
-    EMAData = pd.DataFrame()
-    trendList= []
-    startDate = datetime.date(1970,1,1) #这里默认给一个起始时间和结束时间
-    endDate = datetime.date(1970,1,2)
-    totalCashFlowIn=0
-    superCashFlowIn=0
-    bigCashFlowIn=0
-    market=''
-    #def __init__(self, code,dayPriceDataFrame,emaDataFrame):  # 从数据库中取出的是一个dataframe
-    #不接受输入的初始化函数
+     #不接受输入的初始化函数
     def __init__(self):
         pass
 
@@ -40,6 +29,9 @@ class StockClass:
         self.startDate = self.dayPriceData['DATE'].iloc[0]
         self.endDate = self.dayPriceData['DATE'].iloc[-1]
         self.market=market
+        self.totalCashFlowIn = 0
+        self.superCashFlowIn = 0
+        self.bigCashFlowIn = 0
         '''
         暂时先不用ema跑流程
         # 更新EMA数据

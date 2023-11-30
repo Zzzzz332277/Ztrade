@@ -21,20 +21,27 @@ from futu import *
 
 if __name__ == '__main__':
     '''
+    startDate = date(2023, 8, 1)
+    endDate = date(2023, 11,17)
     TradeCalendar = 'HKEX'
     sql = f'select * from daypricedata where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-11-1"'
     outData = pd.DataFrame()
     outData = pd.read_sql(text(sql), con=database.con)
     outDataClose = outData['CLOSE']
-    tic = recognition.TechIndex(database.con,database.engine,database.session,TradeCalendar)
-    tic.CalAllRSI(['0700.HK'])
+    #tic = recognition.TechIndex(database.con,database.engine,database.session,TradeCalendar)
+    #tic.CalAllRSI(['0700.HK'])
+    gwd = database.GetWindDaTA(database.con,database.engine,database.session,TradeCalendar)
+    rsidata=gwd.SyncDataBaseMACD(['0700.HK'],startDate,endDate)
+    pass
     '''
+
+
+
     #main.ZtradeHK()
 
     main.ZtradeUS()
 
-    #startDate = date(2023, 8, 1)
-    #endDate = date(2023, 11,16)
+
 
     #TradeCalendar='HKEX'
 
@@ -49,9 +56,8 @@ def ZtradeHK():
     codeDF = pd.read_csv("D:\ztrade\codes.csv")
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
-
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 11, 17)
+    endDate = date(2023, 11, 30)
 
     #codeList=['0001.HK']
 
@@ -69,23 +75,23 @@ def ZtradeHK():
 
 def ZtradeUS():
     # f= open(, encoding="utf-8")
-    TradeCalendar='NYSE'
-    codeDF = pd.read_csv("D:\ztrade\codesUS.csv")
+    TradeCalendar_US='NYSE'
+    codeDF = pd.read_csv("D:\ztrade\heatChartUS.csv",encoding="gb2312")
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
 
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 11, 17)
+    endDate = date(2023, 11,29)
 
     #codeList=['AAPL.O']
 
     pass
-    dtp = database.DataPrepare(database.conUS,database.engineUS,database.sessionUS,TradeCalendar)
+    dtp_US = database.DataPrepare(database.conUS,database.engineUS,database.sessionUS,TradeCalendar_US)
     # 准备好待处理的stock类
-    stocks = dtp.DataPreWindDB(codeList, startDate, endDate)
+    stocks_US = dtp_US.DataPreWindDB(codeList, startDate, endDate)
     # 识别的类
-    recog = recognition.Recognition()
-    recog.RecognitionProcess(stocks)
-    zft = zfutu.Zfutu(market='US')
-    zft.ModifyFutuStockList(recog.resultTable)
+    recog_US = recognition.Recognition()
+    recog_US.RecognitionProcess(stocks_US)
+    zft_US = zfutu.Zfutu(market='US')
+    zft_US.ModifyFutuStockList(recog_US.resultTable)
     pass

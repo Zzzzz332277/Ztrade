@@ -42,8 +42,9 @@ pass
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
     recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
-    resultTable = pd.DataFrame(columns=recogProcList)
     def __init__(self):
+        #必须声明为实例变量，放在外面就是类变量
+        self.resultTable = pd.DataFrame(columns=self.recogProcList)
         pass
 
     def RecognitionProcess(self,stocklist):
@@ -257,8 +258,10 @@ class Recognition:
                     EMA30difussion = stock.EMAData['EMA30'].iloc[-1] > stock.EMAData['EMA30'].iloc[-2] and stock.EMAData['EMA30'].iloc[-2] > stock.EMAData['EMA30'].iloc[-3]
                     EMA60difussion = stock.EMAData['EMA60'].iloc[-1] > stock.EMAData['EMA60'].iloc[-2] and stock.EMAData['EMA60'].iloc[-2] > stock.EMAData['EMA60'].iloc[-3]
                     if (EMA5difussion and EMA10difussion and EMA20difussion and EMA30difussion and EMA60difussion):
-                        print(f"{stock.code}均线发散")
-                        return 1
+                        #这里也对最后收盘价进行验证
+                        if stock.dayPriceData['CLOSE'].iloc[-1]>stock.dayPriceData['CLOSE'].iloc[-2]:
+                            print(f"{stock.code}均线发散")
+                            return 1
 
         print(f"{stock.code}均线不发散")
         return 0
@@ -326,7 +329,7 @@ class Recognition:
 
     def MoneyFLowFutu(self,stock):
         #富途默认是当天的结果，没有日期参数
-        treshHold = 0.20
+        treshHold = 0.19
         #先进行转化code
         codeFutu=zfutu.CodeTransWind2FUTU(stock.code)
         ret, data = zfutu.quote_ctx.get_capital_distribution(codeFutu)
@@ -353,6 +356,10 @@ class Recognition:
         stock.totalCashFlowIn=totalCashFlowIn
         stock.superCashFlowIn=cashFLowSup
         stock.bigCashFlowIn=cashFLowBig
+
+        if cashFLowSup<0 or cashFLowBig<0:
+            print('大单流入资金不足')
+            return 0
 
         if totalCashFlowIn<10000000:
             print('流入资金不足1000万')
@@ -435,8 +442,24 @@ class Recognition:
 #################################################识别下降类的程序##################################################
     #识别弧形顶
     def EMA5TOPArc(self,stock):
-        print('开始识别弧形底部')
+        print('开始识别弧形顶部')
 
+        # 对于最后一条K线的判断
+        lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+        lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+        lastHigh = stock.dayPriceData['HIGH'].iloc[-1]
+        lastLow = stock.dayPriceData['LOW'].iloc[-1]
+
+        # 是阳线
+        if lastClose > lastOpen:
+            return 0
+        # 上下影线计算，到这步直接是阴线
+        upShadowLen = abs(lastHigh - lastOpen)
+        downShadowLen = abs(lastLow - lastClose)
+        candleLen = abs(lastOpen - lastClose)
+        # 下影线不能超过1/2长度
+        if downShadowLen > (candleLen / 2):
+            return 0
         # 这里先锁死5个值
         type = '5'
         if type != '3' and type != '5':
@@ -545,7 +568,7 @@ class TechIndex():
                 KDJResult.to_sql(name='kdj', con=self.engine, if_exists="append", index=False)
                 self.con.commit()
                 # 更新index的结果
-                self.UpdateTechIndex(self.session,code,dbStartDate,dbEndDate,'KDJ')
+                self.UpdateTechIndex(self.session,code,dbStartDate,dbEndDate,'kdj')
 
             else:
                 KDJStartDate = index.STARTDATE
@@ -587,7 +610,7 @@ class TechIndex():
                 self.con.commit()
 
                 # 更新index的结果
-                self.UpdateTechIndex(self.session,code,KDJStartDate,dpdendDate,'KDJ')
+                self.UpdateTechIndex(self.session,code,KDJStartDate,dpdendDate,'kdj')
 
     def CalKDJTalib(self,inputDF,code):
         KDJResult = pd.DataFrame()
@@ -616,7 +639,7 @@ class TechIndex():
             print(f'计算{code} EMA')
             emaPreValueDict={} #用来存放各个周期的第一个值的字典
             # code在表中存在的情况下，在表中分别获取日线数据和ema数据的startdate和enddate
-            EMAindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'EMA').first()
+            EMAindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'EXPMA').first()
             dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
             if dayPriceDataIndex == None:
                 print(f'{code}没有日线数据,无法计算')
@@ -678,7 +701,7 @@ class TechIndex():
             concatDataframe.to_sql(name='expma', con=self.engine, if_exists="append", index=False)
             #pymysql更新后需要提交事务，避免查不到数据
             self.con.commit()
-            self.UpdateTechIndex(self.session,code,EMAIndexStartDate,EmaCalEndDate,'ema')
+            self.UpdateTechIndex(self.session,code,EMAIndexStartDate,EmaCalEndDate,'expma')
 
 
 
@@ -805,6 +828,16 @@ class TechIndex():
         risdata = pd.concat([price, clprcChange, upPrc, downPrc], axis=1)
         risdata.columns = ['price', 'PrcChange', 'upPrc', 'downPrc']
         risdata = risdata.dropna()
+
+        #这里需要修改一下，试着先计算出前period个数个平均值，作为后续的ewm的初始值，看是否有影响
+        firstUpPrc=np.mean(upPrc.values[1:period])
+        firstUpPrcSeris=pd.Series([firstUpPrc])
+        firstDownPrc=np.mean(downPrc.values[1:period])
+        firstDownPrcSeris=pd.Series([firstDownPrc])
+        upPrcBack=upPrc[(period):-1]
+        downPrcBack=downPrc[(period):-1]
+        upPrcConcat=pd.concat([firstUpPrcSeris,upPrcBack], axis=0)
+        downPrcConcat=pd.concat([firstDownPrcSeris,downPrcBack], axis=0)
         #SMUP = []
         #SMDOWN = []
         '''
@@ -813,10 +846,10 @@ class TechIndex():
             SMUP.append(np.mean(upPrc.values[(i - period): i], dtype=np.float32))
             SMDOWN.append(np.mean(downPrc.values[(i - period): i], dtype=np.float32))
         '''
-        SMUP=upPrc.ewm(alpha=1/period,adjust=False).mean()
-        SMDOWN=downPrc.ewm(alpha=1/period,adjust=False).mean()
-        #rsi = [100 * SMUP.iloc[i] / (SMUP.iloc[i] + SMDOWN.iloc[i]) for i in range(0, len(SMUP))]
-
+        SMUP=upPrcConcat.ewm(alpha=1/period,adjust=False).mean()
+        SMDOWN=downPrcConcat.ewm(alpha=1/period,adjust=False).mean()
+        rsi = [100 * SMUP.iloc[i] / (SMUP.iloc[i] + SMDOWN.iloc[i]) for i in range(0, len(SMUP))]
+        rsipd=pd.DataFrame(rsi)
         #indexRsi = indexprc[(period - 1):]
         #rsi = pd.Series(rsi, index=indexRsi)
         return SMUP,SMDOWN
