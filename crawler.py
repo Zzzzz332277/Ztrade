@@ -58,6 +58,8 @@ futureapiurltail='%22)&pageNumber=1&pageSize=1&sortTypes=-1&sortColumns=TRADE_DA
 urlSH='https://push2.eastmoney.com/api/qt/ulist.np/get?&secids=1.000001&fields=f62%2Cf184%2Cf66%2Cf69%2Cf72%2Cf75%2Cf78%2Cf81%2Cf84%2Cf87%2Cf64%2Cf65%2Cf70%2Cf71%2Cf76%2Cf77%2Cf82%2Cf83%2Cf164%2Cf166%2Cf168%2Cf170%2Cf172%2Cf252%2Cf253%2Cf254%2Cf255%2Cf256%2Cf124%2Cf6%2Cf278%2Cf279%2Cf280%2Cf281%2Cf282&ut=b2884a393a59ad64002292a3e90d46a5&_=1700727803637'
 urlSZ='https://push2.eastmoney.com/api/qt/ulist.np/get?&fltt=2&secids=0.399001&fields=f62%2Cf184%2Cf66%2Cf69%2Cf72%2Cf75%2Cf78%2Cf81%2Cf84%2Cf87%2Cf64%2Cf65%2Cf70%2Cf71%2Cf76%2Cf77%2Cf82%2Cf83%2Cf164%2Cf166%2Cf168%2Cf170%2Cf172%2Cf252%2Cf253%2Cf254%2Cf255%2Cf256%2Cf124%2Cf6%2Cf278%2Cf279%2Cf280%2Cf281%2Cf282&ut=b2884a393a59ad64002292a3e90d46a5&_=1700727959888'
 
+#北向资金：
+urlNorthMoney='https://datacenter-web.eastmoney.com/api/data/v1/get?&reportName=RPT_MUTUAL_QUOTA&columns=TRADE_DATE%2CMUTUAL_TYPE%2CBOARD_TYPE%2CMUTUAL_TYPE_NAME%2CFUNDS_DIRECTION%2CINDEX_CODE%2CINDEX_NAME%2CBOARD_CODE&quoteColumns=status~07~BOARD_CODE%2CdayNetAmtIn~07~BOARD_CODE%2CdayAmtRemain~07~BOARD_CODE%2CdayAmtThreshold~07~BOARD_CODE%2Cf104~07~BOARD_CODE%2Cf105~07~BOARD_CODE%2Cf106~07~BOARD_CODE%2Cf3~03~INDEX_CODE~INDEX_f3%2CnetBuyAmt~07~BOARD_CODE&quoteType=0&pageNumber=1&pageSize=200&sortTypes=1&sortColumns=MUTUAL_TYPE&source=WEB&client=WEB&_=1701937642492'
 
 def getHTMLText(url):
     code = 'UTF-8'
@@ -119,4 +121,17 @@ def GetEastMoneyIndexData(url):
 
     return result
 
-#GetEastMoneyIndexData(urlSZ)
+def GetNorthMoneyData(url):
+    html = getHTMLText(url)
+    htmlJson = eval(html)
+   #多级取值后的比较难看的写法
+    dataSH=htmlJson.get('result').get('data')[0]
+    dataSZ=htmlJson.get('result').get('data')[2]
+
+    moneyNorth2SH=dataSH['dayNetAmtIn']
+    moneyNorth2SZ=dataSZ['dayNetAmtIn']
+
+    totalMoney=moneyNorth2SH+moneyNorth2SZ
+    return totalMoney
+
+#GetNorthMoneyData(urlNorthMoney)

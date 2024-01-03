@@ -54,7 +54,7 @@ class Recognition:
             turnVolumeTresh=5000000 #500万
             lastClose=stockInProcess.dayPriceData['CLOSE'].iloc[-1]
             lastVolume=stockInProcess.dayPriceData['VOLUME'].iloc[-1]
-            #成交量超过一亿才进行判断
+            #成交量超过500万才进行判断
             if lastClose*lastVolume>=turnVolumeTresh:
                 t1=time.time()
                 #这里自动生成字典
@@ -376,10 +376,10 @@ class Recognition:
     def EMA5BottomArc(self,stock):
         print('开始识别弧形底部')
 
-        if stock.market=='HKEX':
+        #if stock.market=='HKEX':
             # 流入资金100万的阈值,这里只针对HK股票
-            if stock.totalCashFlowIn<1000000:
-                return 0
+            #if stock.totalCashFlowIn<1000000:
+                #return 0
             # 加入一个资金流入的筛选判断
             #if stock.superCashFlowIn < 0 or stock.bigCashFlowIn < 0:
                 #return 0
@@ -429,7 +429,7 @@ class Recognition:
         if type == '3':
             # 3个值
             data = stock.EMAData['EMA5']
-            arr = np.array()
+            arr=np.zeros(3)
             for i in range(0, 3):
                 arr[i] = stock.EMAData['EMA5'].iloc[i - 3]
             posMin = np.argmin(arr)
@@ -488,7 +488,7 @@ class Recognition:
         if type == '3':
             # 3个值
             data = stock.EMAData['EMA5']
-            arr = np.array()
+            arr=np.zeros(3)
             for i in range(0, 3):
                 arr[i] = stock.EMAData['EMA5'].iloc[i - 3]
             posMax = np.argmax(arr)
@@ -515,6 +515,9 @@ class Recognition:
                 return 1
             else:
                 return 0
+
+
+
 
 class MainIndexAnalysis():
     def __init__(self):
@@ -544,7 +547,7 @@ class TechIndex():
         for code in codelist:
             print(f'计算{code} kdj')
             # code在表中存在的情况下，在表中获取startdate和enddate
-            index = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE=='KDJ').first()
+            index = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE=='kdj').first()
             if index == None:
                 #说明里面没有数据，直接取所有daypricedata进行计算，并更新index
                 index = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
@@ -634,7 +637,7 @@ class TechIndex():
         return KDJResult
 
     def CalAllEMA(self,codelist):
-        w.start()
+        #w.start()
         for code in codelist:
             print(f'计算{code} EMA')
             emaPreValueDict={} #用来存放各个周期的第一个值的字典
@@ -878,7 +881,98 @@ class TechIndex():
                 downData[i]=α * downPrc.iloc[i] + (1 - α) * downData[i - 1]
         return upData,downData  # 从首开始循环
 
+    def CalSingleMACD(self,code):
+        print(f'计算{code} MACD')
+        #emaPreValueDict = {}  # 用来存放各个周期的第一个值的字典
+        # code在表中存在的情况下，在表中分别获取日线数据和ema数据的startdate和enddate
+        MACDindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,
+                                                                     database.TechDateIndex.TECHINDEXTYPE == 'macd').first()
+        dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+        if dayPriceDataIndex == None:
+            print(f'{code}没有日线数据,无法计算')
+            return 0
+        if MACDindex != None and MACDindex.ENDDATE == dayPriceDataIndex.ENDDATE:
+            print(f'{code}已有macd数据，不用计算')
+            return 0
 
+        # 没有EMA但是有日线数据的情况下
+        if MACDindex == None:
+            # 说明里面没有数据，需要取全部数据重新计算MACD
+            dayPriceDataStartStr = dayPriceDataIndex.STARTDATE.strftime('%Y-%m-%d')
+            dayPriceDataEndStr = dayPriceDataIndex.ENDDATE.strftime('%Y-%m-%d')
+            sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dayPriceDataStartStr}" and "{dayPriceDataEndStr}"'
+            outData = pd.DataFrame()
+            outData = pd.read_sql(text(sql), con=self.con)
+            outData = outData.sort_values(by="DATE", ascending=True)
+            closeDataSeries = outData['CLOSE']
+            #这里求出的ema6和ema12在数据够多的情况下才准确，前部不准
+            EMA12 = closeDataSeries.ewm(span=12, min_periods=0, adjust=False, ignore_na=False).mean()
+            EMA26 = closeDataSeries.ewm(span=26, min_periods=0, adjust=False, ignore_na=False).mean()
+
+            DIF=EMA12-EMA26
+            #DEA = DIF.ewm(9, adjust=False).mean()
+            DEA=self.CalSingleEMA(list=DIF.tolist(),period=9,prevalue=DIF.iloc[0])
+            DEA=pd.Series(DEA)
+            BAR = 2 * (DIF - DEA)
+
+            MACDRestult = pd.DataFrame()
+
+            MACDRestult['DATE'] = outData['DATE']
+            MACDRestult['CODE'] = code
+            MACDRestult['EMA12'] = EMA12
+            MACDRestult['EMA26'] = EMA26
+            MACDRestult['DIF'] = DIF
+            MACDRestult['DEA'] = DEA
+            MACDRestult['BAR'] = BAR
+
+            # 写入数据库,并更新index
+            MACDRestult.to_sql(name='macd', con=self.engine, if_exists="append", index=False)
+            # pymysql更新后需要提交事务，避免查不到数据
+            self.con.commit()
+            self.UpdateTechIndex(self.session, code, dayPriceDataIndex.STARTDATE, dayPriceDataIndex.ENDDATE, 'macd')
+        # 有EMA也有日线数据的情况下
+        else:
+            MACDIndexStartDate = MACDindex.STARTDATE
+            MACDIndexEndDate = MACDindex.ENDDATE
+            # 需要计算ema的区间
+            MACDCalStartDate = MACDIndexEndDate + timedelta(days=1)
+            MACDCalEndDate = dayPriceDataIndex.ENDDATE
+            # 查询macd取出前一个值并计算
+            MACDFirst = self.session.query(database.MACD).filter(database.MACD.CODE == code,database.MACD.DATE == MACDIndexEndDate).first()
+            EMA12PreValue = MACDFirst.EMA12
+            EMA26PreValue = MACDFirst.EMA26
+            DEAPreValue=MACDFirst.DEA
+            #计算各个值
+            dayPriceDataStartStr = MACDCalStartDate.strftime('%Y-%m-%d')
+            dayPriceDataEndStr = MACDCalEndDate.strftime('%Y-%m-%d')
+            sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dayPriceDataStartStr}" and "{dayPriceDataEndStr}"'
+            outData = pd.DataFrame()
+            outData = pd.read_sql(text(sql), con=self.con)
+            outData = outData.sort_values(by="DATE", ascending=True)
+            closeDataSeries = outData['CLOSE']
+
+            EMA12=pd.Series(self.CalSingleEMA(list=closeDataSeries.tolist(),period=12,prevalue=EMA12PreValue))
+            EMA26=pd.Series(self.CalSingleEMA(list=closeDataSeries.tolist(),period=26,prevalue=EMA26PreValue))
+
+            DIF=EMA12-EMA26
+            DEA=self.CalSingleEMA(list=DIF.tolist(),period=9,prevalue=DEAPreValue)
+            BAR = 2 * (DIF - DEA)
+
+            MACDRestult = pd.DataFrame()
+
+            MACDRestult['DATE'] = outData['DATE']
+            MACDRestult['CODE'] = code
+            MACDRestult['EMA12'] = EMA12
+            MACDRestult['EMA26'] = EMA26
+            MACDRestult['DIF'] = DIF
+            MACDRestult['DEA'] = DEA
+            MACDRestult['BAR'] = BAR
+
+            # 写入数据库,并更新index
+            MACDRestult.to_sql(name='macd', con=self.engine, if_exists="append", index=False)
+            # pymysql更新后需要提交事务，避免查不到数据
+            self.con.commit()
+            self.UpdateTechIndex(self.session, code, MACDIndexStartDate, MACDCalEndDate, 'macd')
 
     def UpdateTechIndex(self,session,code,startDate,endDate,techIndexType):
         queryResult = session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE==techIndexType).all()
@@ -899,3 +993,37 @@ class TechIndex():
             return 0
 
 
+#验证macd的计算是否准确
+'''
+sql = f'select * from daypricedata where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-12-29"'
+outData = pd.DataFrame()
+outData = pd.read_sql(text(sql), con=database.con)
+outDataClose = outData['CLOSE'].tolist()
+#tic=recognition.TechIndex()
+outDataCloseSeries= outData['CLOSE']
+
+#span刚好与周期数相等
+ema_10 = np.array(outDataCloseSeries.ewm(span=10, min_periods=0, adjust=False, ignore_na=False).mean())
+ema_10_talib= talib.EMA(np.array(outDataClose), timeperiod=10)
+sql1EMA = f'select * from expma where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-12-29"'
+outDataEMA = pd.read_sql(text(sql1EMA), con=database.con)
+outDataEMA10=outDataEMA[outDataEMA['PERIOD']==10]
+outDataEMA10value=np.array(outDataEMA10['EXPMA'])
+delta=outDataEMA10value-ema_10_talib
+delta2=outDataEMA10value-ema_10
+
+ema12= np.array(outDataCloseSeries.ewm(span=12, min_periods=0, adjust=False, ignore_na=False).mean())
+ema26= np.array(outDataCloseSeries.ewm(span=26, min_periods=0, adjust=False, ignore_na=False).mean())
+df=pd.DataFrame()
+df['MACD'],df['MACDsignal'],df['MACDhist'] = talib.MACD(np.array(outDataClose), fastperiod=6, slowperiod=12, signalperiod=9)
+
+
+
+pass
+
+
+TradeCalendar='HKEX'
+ti=TechIndex(database.con,database.engine,database.session,TradeCalendar)
+ti.CalSingleMACD('0700.HK')
+pass
+'''

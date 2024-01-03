@@ -9,6 +9,7 @@ from sqlalchemy import text
 #import matplotlib.ticker as ticker
 import database
 import basic
+import index
 import main
 import recognition
 import stockclass
@@ -20,33 +21,15 @@ from futu import *
 ################################################################################################
 
 if __name__ == '__main__':
-    '''
-    startDate = date(2023, 8, 1)
-    endDate = date(2023, 11,17)
-    TradeCalendar = 'HKEX'
-    sql = f'select * from daypricedata where CODE = "0700.HK" AND DATE between "2023-8-1" and "2023-11-1"'
-    outData = pd.DataFrame()
-    outData = pd.read_sql(text(sql), con=database.con)
-    outDataClose = outData['CLOSE']
-    #tic = recognition.TechIndex(database.con,database.engine,database.session,TradeCalendar)
-    #tic.CalAllRSI(['0700.HK'])
-    gwd = database.GetWindDaTA(database.con,database.engine,database.session,TradeCalendar)
-    rsidata=gwd.SyncDataBaseMACD(['0700.HK'],startDate,endDate)
-    pass
-    '''
+
+
 
 
 
     #main.ZtradeHK()
 
     main.ZtradeUS()
-
-
-
-    #TradeCalendar='HKEX'
-
-    #gwd=database.GetWindDaTA(database.con,database.engine,database.session,TradeCalendar)
-    #gwd.UpdateTimePeriodCapitalSingle('0700.HK',startDate,endDate,'capitalflow')
+    #main.AindexAnalyze()
 
     pass
 
@@ -57,7 +40,8 @@ def ZtradeHK():
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 11, 30)
+    #endDate = date(2024,1, 2)
+    endDate=date.today()
 
     #codeList=['0001.HK']
 
@@ -81,17 +65,35 @@ def ZtradeUS():
     codeList = codeDF['WindCodes'].tolist()
 
     startDate = date(2023, 8, 1)
-    endDate = date(2023, 11,29)
+    #endDate = date(2023, 12,29)
+    endDate=date.today()-timedelta(days=1)
 
-    #codeList=['AAPL.O']
+    #codeList=['AES.N']
 
     pass
     dtp_US = database.DataPrepare(database.conUS,database.engineUS,database.sessionUS,TradeCalendar_US)
     # 准备好待处理的stock类
     stocks_US = dtp_US.DataPreWindDB(codeList, startDate, endDate)
+    #使用stock列表进行beta分析
+    #result= index.BetaAnalyze(startDate,endDate,stocks_US)
+    pass
     # 识别的类
     recog_US = recognition.Recognition()
     recog_US.RecognitionProcess(stocks_US)
     zft_US = zfutu.Zfutu(market='US')
     zft_US.ModifyFutuStockList(recog_US.resultTable)
+
+    #针对美股加入相关性与beta的分析
+    pass
+
+def AindexAnalyze():
+    startDate = date(2023, 8, 1)
+    #endDate = date(2023, 12, 19)
+    enddate=date.today()
+    pass
+    aIndex=index.Aindex(database.con, database.engine, database.session)
+    indexList=aIndex.DataPreWindDB(startDate,enddate)
+    for indexs in indexList:
+        aIndex.ProbabilityProc(indexs)
+
     pass
