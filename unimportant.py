@@ -16,7 +16,7 @@ from futu import *
 #codeList = codeDF['WindCodes'].tolist()
 quote_ctx = OpenQuoteContext(host='127.0.0.1', port=11111)
 
-ret, data, page_req_key = quote_ctx.request_history_kline('HK.00700', start='2019-09-11', end='2019-09-18', max_count=1000,page_req_key=None)  # 每页5个，请求第一页
+ret, data, page_req_key = quote_ctx.request_history_kline('SH.000001', start='2019-09-11', end='2019-09-18', max_count=1000,page_req_key=None)  # 每页5个，请求第一页
 if ret == RET_OK:
     print(data)
     buffData=pd.DataFrame()

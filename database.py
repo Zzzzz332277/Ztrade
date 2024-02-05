@@ -122,6 +122,8 @@ class RSI(Base):
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
     DATE= Column(Date)
+    UPSMA= Column(Float)
+    DOWNSMA= Column(Float)
     RSI= Column(Float)
     PERIOD= Column(Integer)
 
@@ -286,6 +288,10 @@ class GetWindDaTA:
         codeFutu=self.CodeTransferWIND2FUTUSingle(code)
         ret, data, page_req_key = zfutu.quote_ctx.request_history_kline(codeFutu, start=statrTimeStr, end=endTimeStr,max_count=1000, page_req_key=None)
         if ret == RET_OK:
+            if data.empty:
+                # 抛出无数据的异常
+                #raise myexception.ExceptionFutuNoData('Futu: No data.')
+                return 0,0,0
             buffData = pd.DataFrame()
             timeStrSeries = data['time_key']
             timeDateList = []
@@ -315,10 +321,9 @@ class GetWindDaTA:
         time.sleep(0.5)
 
         # 获取data的最后一个日期，作为codedateindex日期
-        # lastDate=data['DATE'].iloc[-1]
-        # firstDate=data['DATE'].iloc[0]
-        # return 1,firstDate,lastDate
-        return 1
+        lastDate=buffData['DATE'].iloc[-1]
+        firstDate=buffData['DATE'].iloc[0]
+        return 1,firstDate,lastDate
 
     #获取EMA数据并写入数据库
     def UpdateTimePeriodDataEMA(self, codelist, startDate, endDate,tableName):
@@ -907,9 +912,9 @@ class GetWindDaTA:
             if len(codeResult) == 0:
                 print(f'表中无该{code}数据,开始获取新数据')
                 try:
-                    result,firstDate,lastDate = self.UpdateTimePeriodDataSingle(code=code, startDate=startdate, endDate=enddate,tableName='daypricedata')
-                except myexception.ExceptionWindNoData as e:
-                    print("非交易日，无数据")
+                    result,firstDate,lastDate = self.UpdateTimePeriodDataSingleFutu(code=code, startDate=startdate, endDate=enddate,tableName='daypricedata')
+                except myexception.ExceptionFutuNoData as e:
+                    print("无数据")
                     continue
                 if result: self.UpdateCodeIndex(code, firstDate, lastDate, self.session)
                 continue
@@ -924,13 +929,13 @@ class GetWindDaTA:
                 # 补充前方数据并更新前方index
                 startdatebuff = startdate
                 endDatebuff = dbStartDate - oneDay
-                result, firstDateFront, lastDateFront = self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff, 'daypricedata')
+                result, firstDateFront, lastDateFront = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff, endDatebuff, 'daypricedata')
                 if result: self.UpdateCodeIndex(code, firstDateFront, dbEndDate, self.session)
 
                 # 补充后方数据并更新后方index
                 startdatebuff = dbEndDate + oneDay
                 endDatebuff = enddate
-                result, firstDateBack, lastDateBack  = self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff, 'daypricedata')
+                result, firstDateBack, lastDateBack  = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff, endDatebuff, 'daypricedata')
                 # 这里边界以startdate和enddate为准
                 if result: self.UpdateCodeIndex(code, firstDateFront, lastDateBack, self.session)
                 continue
@@ -943,7 +948,7 @@ class GetWindDaTA:
                     endDatebuff = enddate
                     dbStartDateBuff = dbStartDate
                     dbEndDateBuff = endDatebuff
-                    result, firstDate, lastDate = self.UpdateTimePeriodDataSingle(code, startdatebuff,endDatebuff, 'daypricedata')
+                    result, firstDate, lastDate = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff,endDatebuff, 'daypricedata')
                     # 这里边界以startdate和enddate为准
                     if result: self.UpdateCodeIndex(code, dbStartDate, lastDate, self.session)
                     continue
@@ -953,7 +958,7 @@ class GetWindDaTA:
                     endDatebuff = dbStartDate - oneDay
                     dbStartDateBuff = startdatebuff
                     dbEndDateBuff = dbEndDate
-                    result, firstDate, lastDate = self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff,'daypricedata')
+                    result, firstDate, lastDate = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff, endDatebuff,'daypricedata')
                     # 这里边界以startdate和enddate为准
                     if result: self.UpdateCodeIndex(code, firstDate, dbEndDate, self.session)
                     continue
@@ -970,7 +975,7 @@ class GetWindDaTA:
                         endDatebuff = enddate
                         dbStartDateBuff = dbStartDate
                         dbEndDateBuff = endDatebuff
-                        result, firstDate, lastDate = self.UpdateTimePeriodDataSingle(code, startdatebuff, endDatebuff,'daypricedata')
+                        result, firstDate, lastDate = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff, endDatebuff,'daypricedata')
                         # 这里边界以startdate和enddate为准
                         if result: self.UpdateCodeIndex(code, dbStartDate, lastDate, self.session)
                         continue
@@ -981,7 +986,7 @@ class GetWindDaTA:
                             endDatebuff = dbStartDate - oneDay
                             dbStartDateBuff = startdatebuff
                             dbEndDateBuff = dbEndDate
-                            result, firstDate, lastDate = self.UpdateTimePeriodDataSingle(code, startdatebuff,endDatebuff, 'daypricedata')
+                            result, firstDate, lastDate = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff,endDatebuff, 'daypricedata')
                             # 这里边界以startdate和enddate为准
                             if result: self.UpdateCodeIndex(code, firstDate, dbEndDate, self.session)
                             continue
@@ -1293,7 +1298,7 @@ class DataPrepare():
         #根据日期，代码获取
         gwd = GetWindDaTA(self.con,self.engine,self.session,self.tradingCalendar)
         print('同步数据库')
-        gwd.SyncDateBaseDayPirceData(codelist, startdate, endate, 'codedateindex')
+        gwd.SyncDataBaseDayPirceDataUpdate(codelist, startdate, endate, 'codedateindex')
         #gwd.SyncDataBaseCapitalFLow(codelist, startdate, endate, 'capitalflow')
         #计算ema数据和kdj数据
         tix=recognition.TechIndex(self.con,self.engine,self.session,self.tradingCalendar)
