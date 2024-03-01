@@ -587,6 +587,8 @@ class Aindex:
         if lastRSI6>80:
             return 'rsi_over_buy'
 
+
+
     def KDJArc(self,index):
         kdj=index.KDJData
         arr = np.zeros(3)
@@ -597,7 +599,7 @@ class Aindex:
         if posMax == 1:
             #判断kdj的曲线关系
             if kdj['J'].iloc[-2]>kdj['K'].iloc[-2] and kdj['K'].iloc[-2]>kdj['D'].iloc[-2]:
-                print("底部弧")
+                print("顶部弧")
                 return 'kdj_top_arc'
 
         posMin = np.argmin(arr)
@@ -646,6 +648,129 @@ class Aindex:
     def MoneyFLowNorth(self):
         moneyFlow = crawler.GetNorthMoneyData(crawler.urlNorthMoney)
         return moneyFlow
+    ##############################################进行遍历的信号判断###############################################
+    def RSIOverBuySellSignal(self,index):
+        rsi=index.RSIData
+        ResultArry=np.zeros(rsi.shape[0])
+        for i in range(rsi.shape[0]):
+            RSI6=rsi['RSI6'].iloc[i]
+            if RSI6<15:
+                ResultArry[i]=1
+
+        return ResultArry
+
+    def KDJUpcrossSignal(self,index):
+        kdj = index.KDJData
+        ResultArry=np.zeros(kdj.shape[0])
+        for i in range(kdj.shape[0]):
+            #判断上穿
+            if kdj['J'].iloc[i-1] <= kdj['K'].iloc[i-1] and kdj['J'].iloc[i] > kdj['K'].iloc[i]:
+                ResultArry[i] = 1
+        return ResultArry
+
+        # EMA均线的圆形底
+
+    def EMA5BottomArcSignal(self, index):
+        ema = index.EMAData
+        ResultArry = np.zeros(ema.shape[0])
+        #需要考虑两边的情况，后续是看3日后的值，所以边界-3
+        for i in range(2,ema.shape[0]-3):
+            '''
+            # 对于最后一条K线的判断
+            lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+            lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+            lastHigh = stock.dayPriceData['HIGH'].iloc[-1]
+            lastLow = stock.dayPriceData['LOW'].iloc[-1]
+    
+            # 是阴线
+            if lastClose < lastOpen:
+                return 0
+            # 上下影线计算，到这步直接是阳线
+            upShadowLen = abs(lastHigh - lastClose)
+            downShadowLen = abs(lastLow - lastOpen)
+            candleLen = abs(lastOpen - lastClose)
+            # 上影线不能超过1/2长度
+            if upShadowLen > (candleLen / 2):
+                return 0
+            '''
+            arr = np.zeros(5)
+            for j in range(0, 5):
+                # 取最后5个
+                arr[j] = ema['EMA5'].iloc[i - 2 +j]
+            posMin = np.argmin(arr)
+            if posMin == 3:
+                if arr[1] < arr[0] and arr[2] < arr[1]:
+                    ResultArry[i+2] = 1
+
+
+        return ResultArry
+
+
+    def CalSignalProbability(self,resultarry,index):
+        success=0
+        signalCount=0
+        dayPriceData=index.dayPriceData
+        for i in range(len(resultarry)-3):
+            if resultarry[i]==1:
+                #取三天后的价格判断
+                signalCount=signalCount+1
+                pricePre=dayPriceData['CLOSE'].iloc[i]
+                priceAfter=dayPriceData['CLOSE'].iloc[i+3]
+                if priceAfter>pricePre:
+                    success=success+1
+
+        if signalCount!=0:
+            SignalProb=success/signalCount
+
+        return SignalProb
+
+    def EMA5up10Strategy(self,index):
+        code=index.code
+        success = 0
+        signalCount = 0
+        accumlateReturn=0
+        buyFlag=0
+        buyPrice=0
+        sellPrice=0
+        dayPriceData = index.dayPriceData
+        ema = index.EMAData
+        pos=0
+        for i in range(1,dayPriceData.shape[0]):
+            if ema['EMA5'].iloc[i - 1] <= ema['EMA10'].iloc[i - 1] and ema['EMA5'].iloc[i] > ema['EMA10'].iloc[i]:
+                #上穿，买入
+                buyFlag=1
+                signalCount=signalCount+1
+                #记录买点位置
+                pos=i
+                buyDate=dayPriceData['DATE'].iloc[i]
+                #buyPrice=dayPriceData['CLOSE'].iloc[i]
+                #按照上下穿均线价格买入卖出
+                buyPrice=ema['EMA5'].iloc[i]
+                print(f'{code}买入日期：{buyDate},买入价格{buyPrice}')
+            elif ema['EMA5'].iloc[i - 1] >= ema['EMA10'].iloc[i - 1] and ema['EMA5'].iloc[i] < ema['EMA10'].iloc[i]:
+                # 下穿，卖出
+                if buyFlag==1:
+                    buyFlag = 0
+                    sellDate = dayPriceData['DATE'].iloc[i]
+                    # sellPrice=dayPriceData['CLOSE'].iloc[i]
+                    # 按照上下穿均线价格买入卖出
+                    sellPrice = ema['EMA5'].iloc[i]
+                    gain = (sellPrice - buyPrice) / buyPrice
+                    accumlateReturn = accumlateReturn + gain
+
+                    if gain>0:
+                        success=success+1
+
+
+
+                    print(f'{code}卖出日期：{sellDate}，本次收益率{gain},卖出价格{sellPrice}')
+
+            else:
+                pass
+        if signalCount!=0:
+            SignalProb=success/signalCount
+        return SignalProb,accumlateReturn
+
 
     def ProbabilityProc(self,index):
         UpProbability=0

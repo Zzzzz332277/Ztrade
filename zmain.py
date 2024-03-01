@@ -24,9 +24,9 @@ import main
 
 if __name__ == '__main__':
 
-    #main.ZtradeHK()
+    #zmain.ZtradeHK()
 
-    zmain.ZtradeUS()
+    #zmain.ZtradeUS()
     zmain.AindexAnalyze()
 
     pass
@@ -96,12 +96,17 @@ def ZtradeUS():
 def AindexAnalyze():
     #这里要注意RSI是少一部分的
     startDate = date(2020, 5, 1)
-    enddate = date(2024, 1, 8)
+    enddate = date(2024, 2, 28)
     enddate=date.today()
     pass
     aIndex=index.Aindex(database.con, database.engine, database.session)
     indexList=aIndex.DataPreWindDB(startDate,enddate)
     for indexs in indexList:
         aIndex.ProbabilityProc(indexs)
+        #resultArry=aIndex.EMA5BottomArcSignal(indexs)
+        #prob=aIndex.CalSignalProbability(resultArry,indexs)
+        #print(f'信号成功率为{prob}')
+        prob,AccumGain=aIndex.EMA5up10Strategy(indexs)
+        print(f'成功率为：{prob},收益为{AccumGain}')
 
     pass

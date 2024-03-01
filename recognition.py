@@ -801,6 +801,114 @@ class TechIndex():
                 data[i] = α * list[i] + (1 - α) * data[i - 1]
         return data# 从首开始循环
 
+    #计算MA值
+    def CalAllMAUpdate(self, codelist):
+        for code in codelist:
+            print(f'计算{code} MA')
+            maPreValueDict = {}  # 用来存放各个周期的第一个值的字典
+            # code在表中存在的情况下，在表中分别获取日线数据和MA数据的startdate和enddate
+            MAindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,
+                                                                         database.TechDateIndex.TECHINDEXTYPE == 'MA').first()
+            dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(
+                database.CodeDateIndex.CODE == code).first()
+            if dayPriceDataIndex == None:
+                print(f'{code}没有日线数据,无法计算')
+                continue
+            if MAindex != None and MAindex.ENDDATE == dayPriceDataIndex.ENDDATE:
+                print(f'{code}已有MA数据，不用计算')
+                continue
+
+            # 没有MA但是有日线数据的情况下
+            if MAindex == None:
+                # 说明里面没有数据,重新计算所有数据
+                # 取出日线数据
+                dayPriceDataStartStr = dayPriceDataIndex.STARTDATE.strftime('%Y-%m-%d')
+                dayPriceDataEndStr = dayPriceDataIndex.ENDDATE.strftime('%Y-%m-%d')
+                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dayPriceDataStartStr}" and "{dayPriceDataEndStr}"'
+                outData = pd.DataFrame()
+                outData = pd.read_sql(text(sql), con=self.con)
+                outData = outData.sort_values(by="DATE", ascending=True)
+                closeDataSeries = outData['CLOSE']
+
+                #这里加入判断，普通MA计算数据值必须大于MA的最大周期值
+                if len(closeDataSeries)<basic.maPeriod[-1]:
+                    print(f'{code}数据不足，无法计算')
+                    continue
+
+                # 这里其实应该放在for里面更新，否则在像计算RSI这样周期不相等的数据时就会出问题
+                MACalResult = pd.DataFrame()
+                concatDataframe = pd.DataFrame(columns=["MA", "DATE", "CODE", "PERIOD"])
+                for period in basic.maPeriod:
+                    print(f"获取{code}的{period}MA数据")
+                    MABuff = talib.MA(closeDataSeries,period)
+                    #需要前部的NAN值替换掉
+                    MABuff.fillna(closeDataSeries.iloc[period])
+                    MACalResultList = MABuff.tolist()
+                    MACalResult['DATE'] = outData['DATE']
+                    MACalResult['CODE'] = code
+                    MACalResult['PERIOD'] = period
+                    MACalResult['MA'] = MACalResultList
+                    concatDataframe = pd.concat([concatDataframe, MACalResult])
+                    # 计算后连接到大的dataframe
+                # 写入数据库,并更新index
+                concatDataframe.to_sql(name='ma', con=self.engine, if_exists="append", index=False)
+                # pymysql更新后需要提交事务，避免查不到数据
+                self.con.commit()
+                self.UpdateTechIndex(self.session, code, dayPriceDataIndex.STARTDATE, dayPriceDataIndex.ENDDATE,
+                                     'ma')
+
+            # 有MA也有日线数据的情况下,默认是具有足够的数据的，但是也需要检查
+            else:
+                MAIndexStartDate = MAindex.STARTDATE
+                MAIndexEndDate = MAindex.ENDDATE
+                # 需要计算MA的区间
+                MACalStartDate = MAIndexEndDate + timedelta(days=1)
+                MACalEndDate = dayPriceDataIndex.ENDDATE
+
+                # 取出之前的日线数据参与计算
+                for period in basic.MAPeriod:
+                    #需要取出的数据日期
+                    closeData = self.session.query(database.MA).filter(database.MA.CODE == code,
+                                                                         database.MA.DATE == MAIndexEndDate,
+                                                                         database.MA.PERIOD == period).first()
+                    maPreValueDict[period] = MAFirst.MA
+                # 获取到各个周期第一个值后，获取darpricedata的值,并进行MA的计算
+
+                MACalStartDateStr = MACalStartDate.strftime('%Y-%m-%d')
+                MACalEndDateStr = MACalEndDate.strftime('%Y-%m-%d')
+                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{MACalStartDateStr}" and "{MACalEndDateStr}"'
+                outData = pd.DataFrame()
+                outData = pd.read_sql(text(sql), con=self.con)
+                outData = outData.sort_values(by="DATE", ascending=True)
+                closeDataList = outData['CLOSE'].tolist()
+                # 存储计算结果
+                MACalResult = pd.DataFrame()
+                concatDataframe = pd.DataFrame(columns=["MA", "DATE", "CODE", "PERIOD"])
+                for key in maPreValueDict:
+                    MACalResultList = self.CalSingleMA(list=closeDataList, period=key, prevalue=maPreValueDict[key])
+                    MACalResult['DATE'] = outData['DATE']
+                    MACalResult['CODE'] = code
+                    MACalResult['PERIOD'] = key
+                    MACalResult['EXPMA'] = MACalResultList
+                    concatDataframe = pd.concat([concatDataframe, MACalResult])
+
+                # 写入数据库,并更新index
+                concatDataframe.to_sql(name='expma', con=self.engine, if_exists="append", index=False)
+                # pymysql更新后需要提交事务，避免查不到数据
+                self.con.commit()
+                self.UpdateTechIndex(self.session, code, MAIndexStartDate, MACalEndDate, 'expma')
+
+    #单独计算MA的函数
+    def CalSingleMA(self,list,period,prevalue):
+        data = [0 for _ in range(len(list))]
+        α=1/period
+        for i in range(0,len(list)):
+            if i == 0:
+                data[i] = α * list[i] + α * prevalue
+            else:
+                data[i] = α * list[i] + α * data[i - 1]
+        return data# 从首开始循环
+
     def CalAllRSI(self,codelist):
         for code in codelist:
             print(f'计算{code} RSI')

@@ -103,6 +103,16 @@ class ExpMA(Base):
     EXPMA= Column(Float)
     PERIOD= Column(Integer)
 
+class MA(Base):
+    __tablename__ = 'MA'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+
+    #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATE= Column(Date)
+    MA= Column(Float)
+    PERIOD= Column(Integer)
+
 class KDJ(Base):
     __tablename__ = 'KDJ'
     ID = Column(Integer, primary_key=True)
@@ -168,6 +178,7 @@ class CapitalFlow(Base):
     Big_In_FLow= Column(Float)
     Mid_In_FLow= Column(Float)
     Sml_In_FLow= Column(Float)
+
 
 ####################################创建表格###############################################################
 Base.metadata.create_all(engine)

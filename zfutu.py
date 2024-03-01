@@ -26,6 +26,22 @@ def CodeTransWind2FUTU(code):
     codeNew = codebuff[1] + '.' + '0' + codebuff[0]
     return codeNew
 
+def CodeTransWind2FUTU_US(codelist):
+    codelistNew = list()
+    for code in codelist:
+        codebuff = code.split('.')
+        codeNew = 'US' + '.' + codebuff[0]
+        codelistNew.append(codeNew)
+    return codelistNew
+
+
+def AddFutuList(listname,list):
+    # 再加入新的自选
+    ret, data = quote_ctx.modify_user_security(listname, ModifyUserSecurityOp.ADD, list)
+    if ret == RET_OK:
+        print(data)  # 返回 success
+    else:
+        print('error:', data)
 
 class Zfutu():
     def __init__(self,market):
