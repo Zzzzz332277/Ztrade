@@ -18,16 +18,18 @@ from talib import EMA
 import zfutu
 from futu import *
 import main
+import strategy
+import backtest
 ################################################################################################
 # 程序开始的地方，后面需要加入__main__的判断
 ################################################################################################
 
 if __name__ == '__main__':
-
+    #zmain.BackTest()
     #zmain.ZtradeHK()
 
-    #zmain.ZtradeUS()
-    zmain.AindexAnalyze()
+    zmain.ZtradeUS()
+    #zmain.AindexAnalyze()
 
     pass
 
@@ -39,11 +41,11 @@ def ZtradeHK():
     codeDF = pd.read_csv("D:\ztrade\codes.csv")
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
-    startDate = date(2023, 8, 1)
-    #endDate = date(2024,1, 2)
-    endDate=date.today()
+    startDate = date(2020, 1, 8)
+    endDate = date(2024,3, 4)
+    #endDate=date.today()
 
-    #codeList=['0001.HK']
+    codeList=['3690.HK']
 
     pass
     #使用数据库初始化
@@ -51,10 +53,23 @@ def ZtradeHK():
     # 准备好待处理的stock类
     stocks = dtp.DataPreWindDB(codeList, startDate, endDate)
     # 识别的类
-    recog = recognition.Recognition()
-    recog.RecognitionProcess(stocks)
-    zft = zfutu.Zfutu(market='HK')
-    zft.ModifyFutuStockList(recog.resultTable)
+    #recog = recognition.Recognition()
+    #recog.RecognitionProcess(stocks)
+    #zft = zfutu.Zfutu(market='HK')
+    #zft.ModifyFutuStockList(recog.resultTable)
+    stg=strategy.Strategy()
+    stg.SignalProcess(stocks)
+    '''
+    for stock in stocks:
+
+        prob, AccumGain, cashReturn = strategy.BBIStrategy(stock)
+        print(f'成功率为：{prob},单次累加收益率为{AccumGain},复利收益率为{cashReturn}')
+    pass
+    '''
+    for stock in stocks:
+        resultArray=strategy.MACDTOPArcSignal(stock)
+        signalProb=strategy.CalSignalProbability(resultArray,stock,'down')
+        print(f'{stock.code}成功率为：{signalProb},')
     pass
 
 def ZtradeUS():
@@ -64,11 +79,11 @@ def ZtradeUS():
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
 
-    startDate = date(2023, 8, 1)
-    #endDate = date(2023, 12,29)
+    startDate = date(2019, 12, 22)
+    #endDate = date(2024, 2,29)
     endDate=date.today()-timedelta(days=1)
 
-    #codeList=['AES.N']
+    #codeList=['AAPL.O']
 
 
     pass
@@ -79,7 +94,13 @@ def ZtradeUS():
     #result= index.BetaAnalyze(startDate,endDate,stocks_US)
     pass
     # 识别的类
+    for stock in stocks_US:
+        resultArray = strategy.KDJBottomArcSignal(stock)
+        signalProb = strategy.CalSignalProbability(resultArray, stock)
+        print(f'{stock.code}成功率为：{signalProb},')
 
+
+    pass
 
     recog_US = recognition.Recognition()
     recog_US.RecognitionProcess(stocks_US)
@@ -95,9 +116,9 @@ def ZtradeUS():
 
 def AindexAnalyze():
     #这里要注意RSI是少一部分的
-    startDate = date(2020, 5, 1)
-    enddate = date(2024, 2, 28)
-    enddate=date.today()
+    startDate = date(2020, 1, 1)
+    enddate = date(2024, 3, 3)
+    #enddate=date.today()
     pass
     aIndex=index.Aindex(database.con, database.engine, database.session)
     indexList=aIndex.DataPreWindDB(startDate,enddate)
@@ -106,7 +127,35 @@ def AindexAnalyze():
         #resultArry=aIndex.EMA5BottomArcSignal(indexs)
         #prob=aIndex.CalSignalProbability(resultArry,indexs)
         #print(f'信号成功率为{prob}')
-        prob,AccumGain=aIndex.EMA5up10Strategy(indexs)
-        print(f'成功率为：{prob},收益为{AccumGain}')
+        prob,AccumGain,cashReturn=aIndex.BBIStrategy(indexs)
+        print(f'成功率为：{prob},单次累加收益率为{AccumGain},复利收益率为{cashReturn}')
+
+    pass
+
+def BackTest():
+    TradeCalendar = 'HKEX'
+    codeDF = pd.read_csv("D:\ztrade\codes.csv")
+    # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
+    codeList = codeDF['WindCodes'].tolist()
+    startDate = date(2023, 8, 12)
+    endDate = date(2024, 3, 4)
+    # endDate=date.today()
+
+    codeList = ['0700.HK']
+
+    pass
+    # 使用数据库初始化
+    dtp = database.DataPrepare(database.con, database.engine, database.session, TradeCalendar)
+    # 准备好待处理的stock类
+    stocks = dtp.DataPreWindDB(codeList, startDate, endDate)
+    bbi=stocks[0].BBIData
+    bs = backtest.BackTest()
+    #startDate = date(2022, 3, 11)
+    #endDate = date(2024, 3, 4)
+    result = bs.GetMinuteData(code='HK.00700', start=startDate, end=endDate)
+    #ema=bs.CalMinuteEMA(result)
+    #ma=bs.CalMinuteMA(result)
+    prob, AccumGain, cashReturn,tradeTimes =backtest.BBIStrategyMinute(result,bbi)
+    print(f'成功率为：{prob},单次累加收益率为{AccumGain},复利收益率为{cashReturn},交易笔数为{tradeTimes}')
 
     pass

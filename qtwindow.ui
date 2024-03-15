@@ -63,7 +63,7 @@
      <enum>Qt::CustomContextMenu</enum>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>6</number>
     </property>
     <widget class="QWidget" name="backstepema">
      <attribute name="title">
@@ -109,6 +109,56 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
        </property>
       </column>
      </widget>
@@ -159,6 +209,56 @@
         <string>成交量</string>
        </property>
       </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
+       </property>
+      </column>
      </widget>
     </widget>
     <widget class="QWidget" name="EMAUpCross">
@@ -205,6 +305,56 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
        </property>
       </column>
      </widget>
@@ -255,6 +405,56 @@
         <string>成交量</string>
        </property>
       </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
+       </property>
+      </column>
      </widget>
     </widget>
     <widget class="QWidget" name="EMA5BottomArc">
@@ -301,6 +501,56 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
        </property>
       </column>
      </widget>
@@ -351,6 +601,56 @@
         <string>成交量</string>
        </property>
       </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
+       </property>
+      </column>
      </widget>
     </widget>
     <widget class="QWidget" name="EMADownCross">
@@ -362,7 +662,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>631</width>
+        <width>701</width>
         <height>241</height>
        </rect>
       </property>
@@ -397,6 +697,56 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>RSIOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverBuy</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJOverSell</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>KDJBottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5TopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>EMA5BottomArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDTopArcSignal</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>MACDBottomArcSignal</string>
        </property>
       </column>
      </widget>

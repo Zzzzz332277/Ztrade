@@ -2,7 +2,7 @@ import datetime
 from WindPy import *
 import sqlalchemy
 #from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
+from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date,DateTime,MetaData, ForeignKey, desc, inspect
 import pymysql
 from sqlalchemy.orm import sessionmaker,declarative_base
 import pandas as pd
@@ -45,6 +45,7 @@ con = engine.connect()
 
 engineUS = sqlalchemy.create_engine(f"mysql+pymysql://{DataBaseAddrUS['username']}:{DataBaseAddrUS['password']}@localhost:3306/{DataBaseAddrUS['database']}")
 conUS = engineUS.connect()
+
 
 #这里要分析下con和engine的区别
 Session = sessionmaker(bind=engine)
@@ -179,6 +180,55 @@ class CapitalFlow(Base):
     Mid_In_FLow= Column(Float)
     Sml_In_FLow= Column(Float)
 
+'''
+#######################################################专门用于回测的分钟型数据###################################
+class MinutePriceData(Base):
+    __tablename__ = 'MinutPriceData'
+    ID = Column(Integer, primary_key=True)
+    CODE = Column(String(60))
+    # Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATETIME = Column(DateTime)
+    OPEN = Column(Float)
+    CLOSE = Column(Float)
+    HIGH = Column(Float)
+    LOW = Column(Float)
+    VOLUME = Column(Float)
+
+class MinuteExpMA(Base):
+    __tablename__ = 'MinutExpMA'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+
+    #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATE= Column(DateTime)
+    EXPMA= Column(Float)
+    PERIOD= Column(Integer)
+
+class MinuteMA(Base):
+    __tablename__ = 'MinutMA'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+
+    #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
+    DATE= Column(DateTime)
+    MA= Column(Float)
+    PERIOD= Column(Integer)
+
+class MinuteCodeDateIndex(Base):
+    __tablename__ = 'MinuteCodeDateIndex'
+    ID = Column(Integer, primary_key=True)
+    CODE=Column(String(60))
+    STARTDATE= Column(Date)
+    ENDDATE= Column(Date)
+
+class MinuteTechDateIndex(Base):
+    __tablename__ = 'MinuteTechDateIndex'
+    ID = Column(Integer, primary_key=True)
+    CODE = Column(String(60))
+    STARTDATE = Column(Date)
+    ENDDATE = Column(Date)
+    TECHINDEXTYPE = Column(String(60))
+'''
 
 ####################################创建表格###############################################################
 Base.metadata.create_all(engine)
@@ -687,6 +737,7 @@ class GetWindDaTA:
         self.con.commit()
 
     #将数据库的数据查询出来存储在一个dataframe里，以供后续进行筛选，处理。需要细化传入的是date类型还是字符串
+    '''
     def GetDataBase(self, codeList, startdate, enddate):
         codeListStr=""
         for code in codeList:
@@ -703,6 +754,25 @@ class GetWindDaTA:
         outData = pd.DataFrame()
         #和tosql不一樣，一個用con用，egine，一個用con，
         outData=pd.read_sql(text(sql), con=self.con)
+        outData = outData.sort_values(by="DATE", ascending=True)
+        return outData
+'''
+    def GetDataBase(self, codeList, startdate, enddate, type):
+        codeListStr = ""
+        for code in codeList:
+            codeListStr = codeListStr + "'" + code + "'" + ','
+        codeListStr = codeListStr.rstrip(',')
+
+        startDateStr = startdate.strftime('%Y-%m-%d')
+        endDateStr = enddate.strftime('%Y-%m-%d')
+
+        sql = f'select * from {type} where CODE in ({codeListStr}) AND DATE between "{startDateStr}" and "{endDateStr}"'
+        # sql = "select * from daypricedata"
+        # left join进行筛选带有expma的数据
+        # sql = ‘select * from DayPriceData LEFT JOIN expma ON (DayPriceData.Date=expma.Date AND DayPriceData.Code = expma.Code_ID) where DayPriceData.Code in('1024.HK','3690.HK','0700.HK','0001.HK') AND DayPriceData.Date between "2023-06-01" and "2023-06-05"
+        outData = pd.DataFrame()
+        # 和tosql不一樣，一個用con用，egine，一個用con，
+        outData = pd.read_sql(text(sql), con=self.con)
         outData = outData.sort_values(by="DATE", ascending=True)
         return outData
 
@@ -948,7 +1018,13 @@ class GetWindDaTA:
                 endDatebuff = enddate
                 result, firstDateBack, lastDateBack  = self.UpdateTimePeriodDataSingleFutu(code, startdatebuff, endDatebuff, 'daypricedata')
                 # 这里边界以startdate和enddate为准
-                if result: self.UpdateCodeIndex(code, firstDateFront, lastDateBack, self.session)
+                if result:
+                    #防止出现前方无数据时，firstDateFront是0的情况
+                    if firstDateFront==0:
+                        self.UpdateCodeIndex(code, dbStartDate, lastDateBack, self.session)
+                    else:
+                        self.UpdateCodeIndex(code, firstDateFront, lastDateBack, self.session)
+
                 continue
 
             if (startdate >= dbEndDate or enddate <= dbStartDate) and startdate != enddate:
@@ -1314,14 +1390,21 @@ class DataPrepare():
         #计算ema数据和kdj数据
         tix=recognition.TechIndex(self.con,self.engine,self.session,self.tradingCalendar)
         print('计算技术指标')
-        #tix.CalcKDJ(codelist)
-        tix.CalAllEMA(codelist)
+        tix.CalcKDJ(codelist)
+        tix.CalAllEMAUpdate(codelist)
+        tix.CalAllMAUpdate(codelist)
+        #tix.CalAllRSI(codelist)
+        tix.CalAllMACD(codelist)
 
         #################################测试将数据存进去数据库###########################
         # complexData = gwd.GetTimePeriodData(codelist,startDate,endDate)
         # complexDataEMA =gwd.GetTimePeriodDataEMA(codelist,startDate,endDate)
-        complexData = gwd.GetDataBase(codelist, startdate, endate)
-        complexDataEMA = gwd.GetDataBaseEMA(codelist, startdate, endate)
+        complexData = gwd.GetDataBase(codelist, startdate, endate,'daypricedata')
+        complexDataEMA = gwd.GetDataBase(codelist, startdate, endate,'expma')
+        complexDataMA= gwd.GetDataBase(codelist, startdate, endate,'ma')
+        complexDataKDJ= gwd.GetDataBase(codelist, startdate, endate,'kdj')
+        complexDataRSI = gwd.GetDataBase(codelist, startdate, endate, 'rsi')
+        complexDataMACD= gwd.GetDataBase(codelist, startdate, endate,'macd')
 
         # 声明一个stock类的数组
         stocklist = [stockclass.StockClass for i in range(len(codelist))]
@@ -1330,13 +1413,30 @@ class DataPrepare():
             print(f'准备{code}的数据')
             buffdata = pd.DataFrame()  # 重新声明，避免浅拷贝
             buffEMA = pd.DataFrame()
+            buffMA = pd.DataFrame()
+            buffKDJ = pd.DataFrame()
+            buffRSI = pd.DataFrame()
+            buftMACD = pd.DataFrame()
+
+
             buffdata = complexData[complexData['CODE'] == code]
             # 索引重置
             buffdata = buffdata.reset_index(drop=True)
             #排序顺序
             buffdata = buffdata.sort_values(by="DATE",ascending=True)
 
+            buffKDJ = complexDataKDJ[complexDataKDJ['CODE'] == code]
+            buffKDJ = buffKDJ.reset_index(drop=True)
+            buffKDJ = buffKDJ.sort_values(by="DATE", ascending=True)
+
+            buftMACD = complexDataMACD[complexDataMACD['CODE'] == code]
+            buftMACD = buftMACD.reset_index(drop=True)
+            buftMACD = buftMACD.sort_values(by="DATE", ascending=True)
+
+
             periods = basic.emaPeriod  # 获取到设定好的ema值
+            maPeriods=basic.maPeriod
+            rsiPeriods = basic.rsiPeriod
 
             for period in periods:
                 buffdataEMA = pd.DataFrame()
@@ -1345,9 +1445,36 @@ class DataPrepare():
                 # 对EMA数据的格式进行操作
                 buffEMA['DATE'] = buffdataEMA['DATE'].values
                 buffEMA[f'EMA{period}'] = buffdataEMA['EXPMA'].values
+            # 整理rsi数据
+            for period in rsiPeriods:
+                buffdataRSI = pd.DataFrame()
+                buffdataRSI = complexDataRSI[
+                    (complexDataRSI['CODE'] == code) & (complexDataRSI['PERIOD'] == period)]
+                buffdataRSI = buffdataRSI.sort_values(by="DATE", ascending=True)
+                # 对EMA数据的格式进行操作
+                buffRSI['DATE'] = buffdataRSI['DATE'].values
+                buffRSI[f'RSI{period}'] = buffdataRSI['RSI'].values
 
+
+            for period in maPeriods:
+                buffdataMA = pd.DataFrame()
+                buffdataMA = complexDataMA[
+                    (complexDataMA['CODE'] == code) & (complexDataMA['PERIOD'] == period)]
+                buffdataMA = buffdataMA.sort_values(by="DATE", ascending=True)
+                # 对EMA数据的格式进行操作
+                buffMA['DATE'] = buffdataMA['DATE'].values
+                buffMA[f'MA{period}'] = buffdataMA['MA'].values
+                # 计算BBI数据
+            buffBBI = pd.DataFrame()
+            buffBBI['DATE'] = buffdataMA['DATE'].values
+            buffBBI['BBI'] = 0
+
+            # MA各周期相加求出BBI值
+            for period in maPeriods:
+                buffBBI['BBI'] = buffBBI['BBI'] + buffMA[f'MA{period}']
+            buffBBI['BBI'] = buffBBI['BBI'] / 4
             # 这里对buffdata要进行排序
-            stockClassBuff = stockclass.StockClass(code, buffdata, buffEMA,self.tradingCalendar)
+            stockClassBuff = stockclass.StockClass(code=code, dayPriceData=buffdata, emaData=buffEMA,maData=buffMA,bbiData=buffBBI,kdjData=buffKDJ,rsiData=buffRSI,macdData=buftMACD,market=self.tradingCalendar)
             stocklist[stocklistIndex] = stockClassBuff
             stocklistIndex = stocklistIndex + 1
 

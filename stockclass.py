@@ -18,13 +18,19 @@ class StockClass:
     def __init__(self):
         pass
 
-    def __init__(self, code, dayPriceDataFrame,emaData,market):  # 从数据库中取出的是一个dataframe
+    def __init__(self, code, dayPriceData,emaData,maData,bbiData,kdjData,rsiData,macdData,market):  # 从数据库中取出的是一个dataframe
         self.code = code
         self.trendList = [Trend]
         self.EMAData1 = emaData
         # 直接在这里完成stock的转置和处理
-        self.dayPriceData = dayPriceDataFrame
+        self.dayPriceData = dayPriceData
         self.EMAData = emaData
+        #加入MA和BBI
+        self.MAData = maData
+        self.BBIData=bbiData
+        self.KDJData=kdjData
+        self.RSIData=rsiData
+        self.MACDData=macdData
         #############################获取时间########################
         self.startDate = self.dayPriceData['DATE'].iloc[0]
         self.endDate = self.dayPriceData['DATE'].iloc[-1]
@@ -32,6 +38,11 @@ class StockClass:
         self.totalCashFlowIn = 0
         self.superCashFlowIn = 0
         self.bigCashFlowIn = 0
+
+        #用来存放信号数据成功率的表格
+        self.signalTable= pd.DataFrame()
+        self.signalSucessProb= pd.DataFrame()
+
         '''
         暂时先不用ema跑流程
         # 更新EMA数据

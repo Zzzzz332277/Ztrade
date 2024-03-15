@@ -25,15 +25,17 @@ class Trend:
 # 适用于wind数据的candle
 class IndexClass:
      #不接受输入的初始化函数
-    def __init__(self, code, dayPriceDataFrame,emaData,macdeData,rsiData,kdjData,market):  # 从数据库中取出的是一个dataframe
+    def __init__(self, code, dayPriceDataFrame,emaData,maData,macdeData,rsiData,kdjData,bbiData,market):  # 从数据库中取出的是一个dataframe
         self.code = code
         self.trendList = [Trend]
         # 直接在这里完成stock的转置和处理
         self.dayPriceData = dayPriceDataFrame
         self.EMAData = emaData
+        self.MAData = maData
         self.MACDData=macdeData
         self.RSIData=rsiData
         self.KDJData=kdjData
+        self.BBIData=bbiData
         #############################获取时间########################
         self.startDate = self.dayPriceData['DATE'].iloc[0]
         self.endDate = self.dayPriceData['DATE'].iloc[-1]
@@ -460,9 +462,11 @@ class Aindex:
         #计算指标,更新到数据库中
         tix=recognition.TechIndex(self.con, self.engine, self.session,tradingcalendar='HKEX')
         tix.CalAllEMAUpdate(self.indexCodes)
+        tix.CalAllMAUpdate(self.indexCodes)
         tix.CalcKDJ(self.indexCodes)
         tix.CalAllRSI(self.indexCodes)
         tix.CalAllMACD(self.indexCodes)
+
 
         #gwd.SyncDataBaseCapitalFLow(codelist, startdate, endate, 'capitalflow')
         #计算ema数据和kdj数据
@@ -477,6 +481,7 @@ class Aindex:
         complexDataMACD= self.GetDataBase(self.indexCodes, startdate, endate,'macd')
         complexDataKDJ= self.GetDataBase(self.indexCodes, startdate, endate,'kdj')
         complexDataRSI= self.GetDataBase(self.indexCodes, startdate, endate,'rsi')
+        complexDataMA= self.GetDataBase(self.indexCodes, startdate, endate,'ma')
 
         # 声明一个stock类的数组
         indexList = [IndexClass for i in range(len(self.indexCodes))]
@@ -486,6 +491,8 @@ class Aindex:
             buffDayPriceData = pd.DataFrame()  # 重新声明，避免浅拷贝
             buftMACD=pd.DataFrame()
             buffEMA = pd.DataFrame()
+            buffMA = pd.DataFrame()
+
             buffKDJ = pd.DataFrame()
             buffRSI = pd.DataFrame()
             #rsi和ema需要将数据进行重新排列，其他的不需要
@@ -505,16 +512,36 @@ class Aindex:
 
 
 
-            periods = basic.emaPeriod  # 获取到设定好的ema值
+            emaPeriods = basic.emaPeriod  # 获取到设定好的ema值
+            maPeriods=basic.maPeriod
             rsiPeriods = basic.rsiPeriod
             #整理ema数据
-            for period in periods:
+            for period in emaPeriods:
                 buffdataEMA = pd.DataFrame()
                 buffdataEMA = complexDataEMA[(complexDataEMA['CODE'] == code) & (complexDataEMA['PERIOD'] == period)]
                 buffdataEMA = buffdataEMA.sort_values(by="DATE", ascending=True)
                 # 对EMA数据的格式进行操作
                 buffEMA['DATE'] = buffdataEMA['DATE'].values
                 buffEMA[f'EMA{period}'] = buffdataEMA['EXPMA'].values
+            # 整理ma数据
+            for period in maPeriods:
+                buffdataMA = pd.DataFrame()
+                buffdataMA = complexDataMA[
+                    (complexDataMA['CODE'] == code) & (complexDataMA['PERIOD'] == period)]
+                buffdataMA = buffdataMA.sort_values(by="DATE", ascending=True)
+                # 对EMA数据的格式进行操作
+                buffMA['DATE'] = buffdataMA['DATE'].values
+                buffMA[f'MA{period}'] = buffdataMA['MA'].values
+            #计算BBI数据
+            buffBBI=pd.DataFrame()
+            buffBBI['DATE'] = buffdataMA['DATE'].values
+            buffBBI['BBI'] = 0
+
+            #MA各周期相加求出BBI值
+            for period in maPeriods:
+                buffBBI['BBI']=buffBBI['BBI']+buffMA[f'MA{period}']
+            buffBBI['BBI']=buffBBI['BBI']/4
+
             #整理rsi数据
             for period in rsiPeriods:
                 buffdataRSI = pd.DataFrame()
@@ -525,8 +552,8 @@ class Aindex:
                 buffRSI[f'RSI{period}'] = buffdataRSI['RSI'].values
 
             # 这里对buffdata要进行排序
-            IndexClassBuff = IndexClass(code,dayPriceDataFrame=buffDayPriceData, emaData=buffEMA,macdeData=buftMACD,
-                                        rsiData=buffRSI,kdjData=buffKDJ,market='SZSE')
+            IndexClassBuff = IndexClass(code,dayPriceDataFrame=buffDayPriceData, emaData=buffEMA,maData=buffMA,macdeData=buftMACD,
+                                        rsiData=buffRSI,kdjData=buffKDJ,bbiData=buffBBI,market='SZSE')
             indexList[indexlistIndex] = IndexClassBuff
             indexlistIndex = indexlistIndex + 1
 
@@ -648,128 +675,6 @@ class Aindex:
     def MoneyFLowNorth(self):
         moneyFlow = crawler.GetNorthMoneyData(crawler.urlNorthMoney)
         return moneyFlow
-    ##############################################进行遍历的信号判断###############################################
-    def RSIOverBuySellSignal(self,index):
-        rsi=index.RSIData
-        ResultArry=np.zeros(rsi.shape[0])
-        for i in range(rsi.shape[0]):
-            RSI6=rsi['RSI6'].iloc[i]
-            if RSI6<15:
-                ResultArry[i]=1
-
-        return ResultArry
-
-    def KDJUpcrossSignal(self,index):
-        kdj = index.KDJData
-        ResultArry=np.zeros(kdj.shape[0])
-        for i in range(kdj.shape[0]):
-            #判断上穿
-            if kdj['J'].iloc[i-1] <= kdj['K'].iloc[i-1] and kdj['J'].iloc[i] > kdj['K'].iloc[i]:
-                ResultArry[i] = 1
-        return ResultArry
-
-        # EMA均线的圆形底
-
-    def EMA5BottomArcSignal(self, index):
-        ema = index.EMAData
-        ResultArry = np.zeros(ema.shape[0])
-        #需要考虑两边的情况，后续是看3日后的值，所以边界-3
-        for i in range(2,ema.shape[0]-3):
-            '''
-            # 对于最后一条K线的判断
-            lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
-            lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
-            lastHigh = stock.dayPriceData['HIGH'].iloc[-1]
-            lastLow = stock.dayPriceData['LOW'].iloc[-1]
-    
-            # 是阴线
-            if lastClose < lastOpen:
-                return 0
-            # 上下影线计算，到这步直接是阳线
-            upShadowLen = abs(lastHigh - lastClose)
-            downShadowLen = abs(lastLow - lastOpen)
-            candleLen = abs(lastOpen - lastClose)
-            # 上影线不能超过1/2长度
-            if upShadowLen > (candleLen / 2):
-                return 0
-            '''
-            arr = np.zeros(5)
-            for j in range(0, 5):
-                # 取最后5个
-                arr[j] = ema['EMA5'].iloc[i - 2 +j]
-            posMin = np.argmin(arr)
-            if posMin == 3:
-                if arr[1] < arr[0] and arr[2] < arr[1]:
-                    ResultArry[i+2] = 1
-
-
-        return ResultArry
-
-
-    def CalSignalProbability(self,resultarry,index):
-        success=0
-        signalCount=0
-        dayPriceData=index.dayPriceData
-        for i in range(len(resultarry)-3):
-            if resultarry[i]==1:
-                #取三天后的价格判断
-                signalCount=signalCount+1
-                pricePre=dayPriceData['CLOSE'].iloc[i]
-                priceAfter=dayPriceData['CLOSE'].iloc[i+3]
-                if priceAfter>pricePre:
-                    success=success+1
-
-        if signalCount!=0:
-            SignalProb=success/signalCount
-
-        return SignalProb
-
-    def EMA5up10Strategy(self,index):
-        code=index.code
-        success = 0
-        signalCount = 0
-        accumlateReturn=0
-        buyFlag=0
-        buyPrice=0
-        sellPrice=0
-        dayPriceData = index.dayPriceData
-        ema = index.EMAData
-        pos=0
-        for i in range(1,dayPriceData.shape[0]):
-            if ema['EMA5'].iloc[i - 1] <= ema['EMA10'].iloc[i - 1] and ema['EMA5'].iloc[i] > ema['EMA10'].iloc[i]:
-                #上穿，买入
-                buyFlag=1
-                signalCount=signalCount+1
-                #记录买点位置
-                pos=i
-                buyDate=dayPriceData['DATE'].iloc[i]
-                #buyPrice=dayPriceData['CLOSE'].iloc[i]
-                #按照上下穿均线价格买入卖出
-                buyPrice=ema['EMA5'].iloc[i]
-                print(f'{code}买入日期：{buyDate},买入价格{buyPrice}')
-            elif ema['EMA5'].iloc[i - 1] >= ema['EMA10'].iloc[i - 1] and ema['EMA5'].iloc[i] < ema['EMA10'].iloc[i]:
-                # 下穿，卖出
-                if buyFlag==1:
-                    buyFlag = 0
-                    sellDate = dayPriceData['DATE'].iloc[i]
-                    # sellPrice=dayPriceData['CLOSE'].iloc[i]
-                    # 按照上下穿均线价格买入卖出
-                    sellPrice = ema['EMA5'].iloc[i]
-                    gain = (sellPrice - buyPrice) / buyPrice
-                    accumlateReturn = accumlateReturn + gain
-
-                    if gain>0:
-                        success=success+1
-
-
-
-                    print(f'{code}卖出日期：{sellDate}，本次收益率{gain},卖出价格{sellPrice}')
-
-            else:
-                pass
-        if signalCount!=0:
-            SignalProb=success/signalCount
-        return SignalProb,accumlateReturn
 
 
     def ProbabilityProc(self,index):

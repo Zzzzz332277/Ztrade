@@ -20,6 +20,8 @@ else:
     print('error:', data)
 '''
 
+
+
 #用于转化单个code的函数
 def CodeTransWind2FUTU(code):
     codebuff = code.split('.')

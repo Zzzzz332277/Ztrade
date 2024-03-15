@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QGraphicsWi
     QMenu
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+import strategy
 # Form implementation generated from reading ui file 'qtwindow.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.9
@@ -90,8 +91,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
         codeList = codeDF['WindCodes'].tolist()
 
-        startDate = date(2023, 8, 1)
-        #endDate = date(2024, 2,16)
+        startDate = date(2020, 1, 1)
+        #endDate = date(2024, 2,29)
         endDate = date.today() - timedelta(days=1)
 
         # codeList=['AES.N']
@@ -108,8 +109,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         recog_US = recognition.Recognition()
         recog_US.RecognitionProcess(stocks_US)
 
+        stg_us=strategy.Strategy()
+        stg_us.SignalProcess(stocks_US)
+
         zft_US = zfutu.Zfutu(market='US')
-        #zft_US.ModifyFutuStockList(recog_US.resultTable)
+        zft_US.ModifyFutuStockList(recog_US.resultTable)
 
         self.UpdateTab(stocks_US,recog_US)
 
@@ -157,6 +161,19 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             changePct=format(100*(close-open)/open,'.2f')
             changePctStr=str(changePct)+'%'
 
+            #增加的关于成功率的统计
+            signalProbTable=stock.signalSucessProb
+            RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
+            RSIOverSell=signalProbTable['RSIOverSell'].iloc[0]
+            KDJOverBuy=signalProbTable['KDJOverBuy'].iloc[0]
+            KDJOverSell=signalProbTable['KDJOverSell'].iloc[0]
+            KDJTopArcSignal=signalProbTable['KDJTopArcSignal'].iloc[0]
+            KDJBottomArcSignal=signalProbTable['KDJBottomArcSignal'].iloc[0]
+            EMA5TopArcSignal=signalProbTable['EMA5TopArcSignal'].iloc[0]
+            EMA5BottomArcSignal=signalProbTable['EMA5BottomArcSignal'].iloc[0]
+            MACDTopArcSignal=signalProbTable['MACDTopArcSignal'].iloc[0]
+            MACDBottomArcSignal=signalProbTable['MACDBottomArcSignal'].iloc[0]
+
             row_count = table.rowCount()  # 返回当前行数(尾部)
             table.insertRow(row_count)  # 尾部插入一行
             table.setItem(row_count-1, 0, QtWidgets.QTableWidgetItem(str(code)))
@@ -164,6 +181,20 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             table.setItem(row_count - 1, 2, QtWidgets.QTableWidgetItem(str(close)))
             table.setItem(row_count - 1, 3, QtWidgets.QTableWidgetItem(changePctStr))
             table.setItem(row_count - 1, 4, QtWidgets.QTableWidgetItem(str(volume)))
+
+            #table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(RSIOverBuy)))
+            #table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(str(RSIOverSell)))
+            table.setItem(row_count - 1, 7, QtWidgets.QTableWidgetItem(str(KDJOverBuy)))
+            table.setItem(row_count - 1, 8, QtWidgets.QTableWidgetItem(str(KDJOverSell)))
+            table.setItem(row_count - 1, 9, QtWidgets.QTableWidgetItem(str(KDJTopArcSignal)))
+            table.setItem(row_count - 1, 10, QtWidgets.QTableWidgetItem(str(KDJBottomArcSignal)))
+            table.setItem(row_count - 1, 11, QtWidgets.QTableWidgetItem(str(EMA5TopArcSignal)))
+            table.setItem(row_count - 1, 12, QtWidgets.QTableWidgetItem(str(EMA5BottomArcSignal)))
+            table.setItem(row_count - 1, 13, QtWidgets.QTableWidgetItem(str(MACDTopArcSignal)))
+            table.setItem(row_count - 1, 14, QtWidgets.QTableWidgetItem(str(MACDBottomArcSignal)))
+
+
+
 
 
         pass

@@ -212,6 +212,10 @@ class Recognition:
             if (databuff.iloc[-2] < databuff.iloc[-1]) or (downShadowLen < candleLen):
                 print('不符合回踩标准')
                 return 0
+            #阴线且成交量大于之前的一根
+            if stock.dayPriceData['CLOSE'].iloc[-1]<stock.dayPriceData['OPEN'].iloc[-1] and stock.dayPriceData['VOLUME'].iloc[-1]>stock.dayPriceData['VOLUME'].iloc[-2]:
+                print('最后一根增量下跌，不符合')
+                return 0
             else:
                 distanceList = []
                 distanceToEma5 = abs(closePirce - stock.EMAData['EMA5'].iloc[-1])
@@ -246,6 +250,11 @@ class Recognition:
         if stock.market == 'HKEX':
             sellBid, buyBid, turnOverRate = crawler.GetEastMoneyData(stock.code)
             if sellBid > buyBid:
+                return 0
+        #加入对于最后一根均线多空力量判断的分析，如果最后一根是下跌的阴线，且放量。就排除
+        if stock.dayPriceData['CLOSE'].iloc[-1]<stock.dayPriceData['CLOSE'].iloc[-2] and stock.dayPriceData['CLOSE'].iloc[-1]<stock.dayPriceData['OPEN'].iloc[-1]:
+            if stock.dayPriceData['VOLUME'].iloc[-1]>stock.dayPriceData['VOLUME'].iloc[-2]:
+                print('最后一根增量下跌，不符合')
                 return 0
 
         if stock.EMAData['EMA5'].iloc[-1] > stock.EMAData['EMA10'].iloc[-1]:
@@ -400,8 +409,12 @@ class Recognition:
         #上影线不能超过1/2长度
         if upShadowLen>(candleLen/2):
             return 0
-
-
+        '''
+        # 倒数第二根是阴线，且最后一根阳线成交量未超过倒数第二根
+        if stock.dayPriceData['CLOSE'].iloc[-2] < stock.dayPriceData['OPEN'].iloc[-2] and stock.dayPriceData['VOLUME'].iloc[-1] < stock.dayPriceData['VOLUME'].iloc[-2]:
+            print('上涨成交量不足，不符合')
+            return 0
+        '''
         type='5'
         if type != '3' and type != '5':
             print('type 错误')
@@ -548,17 +561,40 @@ class TechIndex():
             print(f'计算{code} kdj')
             # code在表中存在的情况下，在表中获取startdate和enddate
             index = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE=='kdj').first()
+            dayPriceDataIndex = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
+            if dayPriceDataIndex == None:
+                print(f'{code}没有日线数据,无法计算')
+                continue
+            # 前方数据未对齐的情况
+            if index != None:
+                # 前方数据未对齐的情况
+                if dayPriceDataIndex.STARTDATE < index.STARTDATE:
+                    print(f'{code}前方数据未对齐,删除macd数据重新计算')
+                    delRet = self.session.query(database.KDJ).filter(database.KDJ.CODE == code).delete()
+                    delRetTechIndex = self.session.query(database.TechDateIndex).filter(
+                        database.TechDateIndex.CODE == code,
+                        database.TechDateIndex.TECHINDEXTYPE == 'kdj').delete()
+                    self.session.commit()
+                    # 将index设none
+                    index = None
+                # 前端ema比daypricedata多且后端数据对齐了
+                elif index.ENDDATE == dayPriceDataIndex.ENDDATE:
+                    print(f'{code}已有kdj数据，不用计算')
+                    continue
+
             if index == None:
                 #说明里面没有数据，直接取所有daypricedata进行计算，并更新index
-                index = self.session.query(database.CodeDateIndex).filter(database.CodeDateIndex.CODE == code).first()
-                dbStartDate = index.STARTDATE
-                dbEndDate = index.ENDDATE
+                dbStartDate = dayPriceDataIndex.STARTDATE
+                dbEndDate = dayPriceDataIndex.ENDDATE
                 startDateStr = dbStartDate.strftime('%Y-%m-%d')
                 endDateStr = dbEndDate.strftime('%Y-%m-%d')
                 sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{startDateStr}" and "{endDateStr}"'
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                #必须重置索引，否则日期数据会对齐错误
+                outData.reset_index(inplace=True, drop=True)
+
                 if outData.shape[0]<10:
                     print('数据不足，无法进行计算求取数据')
                     continue
@@ -592,6 +628,8 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 #在数据中定位位置
                 posStart=outData.loc[outData['DATE']==KDJEndDate].index[0]
                 if posStart<12:
@@ -708,9 +746,10 @@ class TechIndex():
 
     #涉及wind的部分进行修改
     def CalAllEMAUpdate(self,codelist):
-        #w.start()
         for code in codelist:
             print(f'计算{code} EMA')
+
+
             emaPreValueDict={} #用来存放各个周期的第一个值的字典
             # code在表中存在的情况下，在表中分别获取日线数据和ema数据的startdate和enddate
             EMAindex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'EXPMA').first()
@@ -718,10 +757,34 @@ class TechIndex():
             if dayPriceDataIndex == None:
                 print(f'{code}没有日线数据,无法计算')
                 continue
-            if EMAindex != None and EMAindex.ENDDATE==dayPriceDataIndex.ENDDATE:
-                print(f'{code}已有ema数据，不用计算')
-                continue
 
+            if EMAindex != None:
+                # 前方数据未对齐的情况
+                if dayPriceDataIndex.STARTDATE < EMAindex.STARTDATE:
+                    print(f'{code}前方数据未对齐,删除ema数据重新计算')
+                    delRetExpma = self.session.query(database.ExpMA).filter(database.ExpMA.CODE == code).delete()
+                    delRetTechIndex = self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,
+                                                                                        database.TechDateIndex.TECHINDEXTYPE == 'EXPMA').delete()
+                    self.session.commit()
+                    # 将index设none
+                    EMAindex = None
+                #前端ema比daypricedata多且后端数据对齐了
+                elif EMAindex.ENDDATE==dayPriceDataIndex.ENDDATE:
+                    print(f'{code}已有ema数据，不用计算')
+                    continue
+            '''     
+            if EMAindex != None and EMAindex.ENDDATE==dayPriceDataIndex.ENDDATE:
+                if dayPriceDataIndex.STARTDATE < EMAindex.STARTDATE:
+                    print(f'{code}前方数据未对齐,删除ema数据重新计算')
+                    delRetExpma= self.session.query(database.ExpMA).filter(database.ExpMA.CODE == code).delete()
+                    delRetTechIndex=self.session.query(database.TechDateIndex).filter(database.TechDateIndex.CODE == code,database.TechDateIndex.TECHINDEXTYPE == 'EXPMA').delete()
+                    self.session.commit()
+                    #将index设none
+                    EMAindex=None
+                else:
+                    print(f'{code}已有ema数据，不用计算')
+                    continue
+            '''
             #没有EMA但是有日线数据的情况下
             if EMAindex == None:
                 # 说明里面没有数据,重新计算所有数据
@@ -732,6 +795,8 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 closeDataSeries = outData['CLOSE']
                 #这里其实应该放在for里面更新，否则在像计算RSI这样周期不相等的数据时就会出问题
                 EMACalResult = pd.DataFrame()
@@ -763,9 +828,17 @@ class TechIndex():
                 EmaCalEndDate = dayPriceDataIndex.ENDDATE
                 # 查询EMA取出前一个值并计算
                 for period in basic.emaPeriod:
+                    start_time = time.time()
+
                     EMAFirst = self.session.query(database.ExpMA).filter(database.ExpMA.CODE == code,database.ExpMA.DATE==EMAIndexEndDate,database.ExpMA.PERIOD==period).first()
+
                     emaPreValueDict[period]=EMAFirst.EXPMA
+                    end_time = time.time()
+
+                    print("耗时: {:.2f}秒".format(end_time - start_time))
+
                 #获取到各个周期第一个值后，获取darpricedata的值,并进行EMA的计算
+
 
                 EmaCalStartDateStr=EmaCalStartDate.strftime('%Y-%m-%d')
                 EmaCalEndDateStr=EmaCalEndDate.strftime('%Y-%m-%d')
@@ -773,10 +846,13 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData=outData.sort_values(by="DATE",ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 closeDataList=outData['CLOSE'].tolist()
                 #存储计算结果
                 EMACalResult=pd.DataFrame()
                 concatDataframe = pd.DataFrame(columns=["EXPMA", "DATE", "CODE", "PERIOD"])
+
                 for key in emaPreValueDict:
                     EMACalResultList=self.CalSingleEMA(list=closeDataList,period=key,prevalue=emaPreValueDict[key])
                     EMACalResult['DATE']=outData['DATE']
@@ -814,9 +890,22 @@ class TechIndex():
             if dayPriceDataIndex == None:
                 print(f'{code}没有日线数据,无法计算')
                 continue
-            if MAindex != None and MAindex.ENDDATE == dayPriceDataIndex.ENDDATE:
-                print(f'{code}已有MA数据，不用计算')
-                continue
+
+            if MAindex != None:
+                # 前方数据未对齐的情况
+                if dayPriceDataIndex.STARTDATE < MAindex.STARTDATE:
+                    print(f'{code}前方数据未对齐,删除ma数据重新计算')
+                    delRetma = self.session.query(database.MA).filter(database.MA.CODE == code).delete()
+                    delRetTechIndex = self.session.query(database.TechDateIndex).filter(
+                        database.TechDateIndex.CODE == code,
+                        database.TechDateIndex.TECHINDEXTYPE == 'MA').delete()
+                    self.session.commit()
+                    # 将index设none
+                    MAindex = None
+                # 前端ema比daypricedata多且后端数据对齐了
+                elif MAindex.ENDDATE == dayPriceDataIndex.ENDDATE:
+                    print(f'{code}已有ma数据，不用计算')
+                    continue
 
             # 没有MA但是有日线数据的情况下
             if MAindex == None:
@@ -828,6 +917,8 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 closeDataSeries = outData['CLOSE']
 
                 #这里加入判断，普通MA计算数据值必须大于MA的最大周期值
@@ -839,10 +930,10 @@ class TechIndex():
                 MACalResult = pd.DataFrame()
                 concatDataframe = pd.DataFrame(columns=["MA", "DATE", "CODE", "PERIOD"])
                 for period in basic.maPeriod:
-                    print(f"获取{code}的{period}MA数据")
+                    print(f"计算{code}的{period}MA数据")
                     MABuff = talib.MA(closeDataSeries,period)
                     #需要前部的NAN值替换掉
-                    MABuff.fillna(closeDataSeries.iloc[period])
+                    MABuff=MABuff.fillna(closeDataSeries.iloc[period-1])
                     MACalResultList = MABuff.tolist()
                     MACalResult['DATE'] = outData['DATE']
                     MACalResult['CODE'] = code
@@ -864,50 +955,44 @@ class TechIndex():
                 # 需要计算MA的区间
                 MACalStartDate = MAIndexEndDate + timedelta(days=1)
                 MACalEndDate = dayPriceDataIndex.ENDDATE
-
-                # 取出之前的日线数据参与计算
-                for period in basic.MAPeriod:
-                    #需要取出的数据日期
-                    closeData = self.session.query(database.MA).filter(database.MA.CODE == code,
-                                                                         database.MA.DATE == MAIndexEndDate,
-                                                                         database.MA.PERIOD == period).first()
-                    maPreValueDict[period] = MAFirst.MA
-                # 获取到各个周期第一个值后，获取darpricedata的值,并进行MA的计算
-
-                MACalStartDateStr = MACalStartDate.strftime('%Y-%m-%d')
-                MACalEndDateStr = MACalEndDate.strftime('%Y-%m-%d')
-                sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{MACalStartDateStr}" and "{MACalEndDateStr}"'
-                outData = pd.DataFrame()
-                outData = pd.read_sql(text(sql), con=self.con)
-                outData = outData.sort_values(by="DATE", ascending=True)
-                closeDataList = outData['CLOSE'].tolist()
-                # 存储计算结果
                 MACalResult = pd.DataFrame()
                 concatDataframe = pd.DataFrame(columns=["MA", "DATE", "CODE", "PERIOD"])
-                for key in maPreValueDict:
-                    MACalResultList = self.CalSingleMA(list=closeDataList, period=key, prevalue=maPreValueDict[key])
-                    MACalResult['DATE'] = outData['DATE']
+                # 取出之前的日线数据参与计算，这里需要注意，MA计算是窗口滑动式，必须要前面有数据，要多取前面period的数据，而且数据需要保证无重复，缺失，否则计算错误
+                for period in basic.maPeriod:
+                    #需要取出的数据日期
+
+                    closeDataPre=self.session.query(database.MA).filter(database.MA.CODE == code,database.MA.PERIOD == period).order_by(database.MA.DATE.desc()).limit(period-1).all()
+                    #找出这period个数据的起始值
+                    closeDataPreDate=closeDataPre[-1].DATE
+                    #再根据时间戳去取出要用close数据
+                    dayPriceDataStartStr = closeDataPreDate.strftime('%Y-%m-%d')
+                    dayPriceDataEndStr = dayPriceDataIndex.ENDDATE.strftime('%Y-%m-%d')
+                    sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dayPriceDataStartStr}" and "{dayPriceDataEndStr}"'
+                    outData = pd.DataFrame()
+                    outData = pd.read_sql(text(sql), con=self.con)
+                    outData = outData.sort_values(by="DATE", ascending=True)
+                    outData.reset_index(inplace=True, drop=True)
+
+                    closeDataSeries = outData['CLOSE']
+
+                    #然后计算结果，写入新的数据
+                    print(f"计算{code}的{period}MA数据")
+                    MABuff = talib.MA(closeDataSeries, period)
+                    # 需要前部的NAN值删除掉
+                    MABuff=MABuff.dropna()
+                    MACalResultList = MABuff.tolist()
+                    MACalResult['DATE'] = outData['DATE'].iloc[(period-1):].reset_index(drop=True)
                     MACalResult['CODE'] = code
-                    MACalResult['PERIOD'] = key
-                    MACalResult['EXPMA'] = MACalResultList
+                    MACalResult['PERIOD'] = period
+                    MACalResult['MA'] = MACalResultList
                     concatDataframe = pd.concat([concatDataframe, MACalResult])
 
-                # 写入数据库,并更新index
-                concatDataframe.to_sql(name='expma', con=self.engine, if_exists="append", index=False)
+
+                concatDataframe.to_sql(name='ma', con=self.engine, if_exists="append", index=False)
                 # pymysql更新后需要提交事务，避免查不到数据
                 self.con.commit()
-                self.UpdateTechIndex(self.session, code, MAIndexStartDate, MACalEndDate, 'expma')
+                self.UpdateTechIndex(self.session, code, MAIndexStartDate, MACalEndDate, 'ma')
 
-    #单独计算MA的函数
-    def CalSingleMA(self,list,period,prevalue):
-        data = [0 for _ in range(len(list))]
-        α=1/period
-        for i in range(0,len(list)):
-            if i == 0:
-                data[i] = α * list[i] + α * prevalue
-            else:
-                data[i] = α * list[i] + α * data[i - 1]
-        return data# 从首开始循环
 
     def CalAllRSI(self,codelist):
         for code in codelist:
@@ -919,9 +1004,24 @@ class TechIndex():
             if dayPriceDataIndex == None:
                 print(f'{code}没有日线数据,无法计算')
                 continue
-            if RSIindex != None and RSIindex.ENDDATE == dayPriceDataIndex.ENDDATE:
-                print(f'{code}已有RSI数据，不用计算')
-                continue
+
+                # 前方数据未对齐的情况
+            if RSIindex != None:
+                # 前方数据未对齐的情况
+                if dayPriceDataIndex.STARTDATE < RSIindex.STARTDATE:
+                    print(f'{code}前方数据未对齐,删除RSI数据重新计算')
+                    delRetRSI = self.session.query(database.RSI).filter(database.RSI.CODE == code).delete()
+                    delRetTechIndex = self.session.query(database.TechDateIndex).filter(
+                        database.TechDateIndex.CODE == code,
+                        database.TechDateIndex.TECHINDEXTYPE == 'rsi').delete()
+                    self.session.commit()
+                    # 将index设none
+                    RSIindex = None
+                # 前端ema比daypricedata多且后端数据对齐了
+                elif RSIindex.ENDDATE == dayPriceDataIndex.ENDDATE:
+                    print(f'{code}已有rsi数据，不用计算')
+                    continue
+
 
             if RSIindex == None:
                 #说明里面没有数据，直接取所有daypricedata进行计算，并更新index
@@ -933,6 +1033,7 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
 
                 # 检查输入的pdf是否有nan
                 if self.CheckDataHasNan(outData):
@@ -991,6 +1092,8 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 closeDataList = outData['CLOSE']
                 # 存储计算结果
                 concatDataframe = pd.DataFrame(columns=["DATE", "CODE", 'UPSMA', 'DOWNSMA', "PERIOD"])
@@ -1096,9 +1199,22 @@ class TechIndex():
             if dayPriceDataIndex == None:
                 print(f'{code}没有日线数据,无法计算')
                 return 0
-            if MACDindex != None and MACDindex.ENDDATE == dayPriceDataIndex.ENDDATE:
-                print(f'{code}已有macd数据，不用计算')
-                return 0
+                # 前方数据未对齐的情况
+            if MACDindex != None:
+                # 前方数据未对齐的情况
+                if dayPriceDataIndex.STARTDATE < MACDindex.STARTDATE:
+                    print(f'{code}前方数据未对齐,删除macd数据重新计算')
+                    delRet = self.session.query(database.MACD).filter(database.MACD.CODE == code).delete()
+                    delRetTechIndex = self.session.query(database.TechDateIndex).filter(
+                        database.TechDateIndex.CODE == code,
+                        database.TechDateIndex.TECHINDEXTYPE == 'macd').delete()
+                    self.session.commit()
+                    # 将index设none
+                    MACDindex = None
+                # 前端ema比daypricedata多且后端数据对齐了
+                elif MACDindex.ENDDATE == dayPriceDataIndex.ENDDATE:
+                    print(f'{code}已有macd数据，不用计算')
+                    continue
 
             # 没有EMA但是有日线数据的情况下
             if MACDindex == None:
@@ -1109,6 +1225,8 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 closeDataSeries = outData['CLOSE']
                 #这里求出的ema6和ema12在数据够多的情况下才准确，前部不准
                 EMA12 = closeDataSeries.ewm(span=12, min_periods=0, adjust=False, ignore_na=False).mean()
@@ -1154,6 +1272,8 @@ class TechIndex():
                 outData = pd.DataFrame()
                 outData = pd.read_sql(text(sql), con=self.con)
                 outData = outData.sort_values(by="DATE", ascending=True)
+                outData.reset_index(inplace=True, drop=True)
+
                 closeDataSeries = outData['CLOSE']
 
                 EMA12=pd.Series(self.CalSingleEMA(list=closeDataSeries.tolist(),period=12,prevalue=EMA12PreValue))

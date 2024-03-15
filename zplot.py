@@ -18,7 +18,7 @@ def plotCandle(code):
     startDate=datetime.date.today()- datetime.timedelta(days=120)
     endDate = datetime.date.today() - datetime.timedelta(days=1)
 
-    data=testGDT.GetDataBase(codeList,startDate,endDate)
+    data=testGDT.GetDataBase(codeList,startDate,endDate,'daypricedata')
     data_column=data.columns[2:8]
     data=data[data_column]
     data.columns=['datetime','open','close','high','low','volume']
