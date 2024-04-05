@@ -64,6 +64,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_EMA5BottomArc.itemDoubleClicked.connect(functools.partial(self.ShowCandle, 4))
         self.tableWidget_EMA5TOPArc.itemDoubleClicked.connect(functools.partial(self.ShowCandle, 5))
         self.tableWidget_EMADownCross.itemDoubleClicked.connect(functools.partial(self.ShowCandle, 6))
+        self.tableWidget_MACDBottomArc.itemDoubleClicked.connect(functools.partial(self.ShowCandle, 7))
+        self.tableWidget_MACDTopArc.itemDoubleClicked.connect(functools.partial(self.ShowCandle, 8))
+
+
 
         self.tableWidget_backstepema.customContextMenuRequested.connect(functools.partial(self.GenerateMenu,0))
         self.tableWidget_EmaDiffusion.customContextMenuRequested.connect(functools.partial(self.GenerateMenu,1))
@@ -72,7 +76,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_EMA5BottomArc.customContextMenuRequested.connect(functools.partial(self.GenerateMenu,4))
         self.tableWidget_EMA5TOPArc.customContextMenuRequested.connect(functools.partial(self.GenerateMenu,5))
         self.tableWidget_EMADownCross.customContextMenuRequested.connect(functools.partial(self.GenerateMenu,6))
-
+        self.tableWidget_MACDBottomArc.customContextMenuRequested.connect(functools.partial(self.GenerateMenu, 7))
+        self.tableWidget_MACDTopArc.customContextMenuRequested.connect(functools.partial(self.GenerateMenu, 8))
 
         #self.pushButton.clicked.connect(self.UpdateTable)
         sys.stdout = Signal()
@@ -91,8 +96,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
         codeList = codeDF['WindCodes'].tolist()
 
-        startDate = date(2020, 1, 1)
-        #endDate = date(2024, 2,29)
+        startDate = date(2024, 1, 3)
+        #endDate = date(2024, 3,15)
         endDate = date.today() - timedelta(days=1)
 
         # codeList=['AES.N']
@@ -110,7 +115,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         recog_US.RecognitionProcess(stocks_US)
 
         stg_us=strategy.Strategy()
-        stg_us.SignalProcess(stocks_US)
+        #stg_us.SignalProcess(stocks_US)
+        stg_us.LoadExcel(stocks_US)
+
 
         zft_US = zfutu.Zfutu(market='US')
         zft_US.ModifyFutuStockList(recog_US.resultTable)
@@ -128,7 +135,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.textBrowser.ensureCursorVisible()
 
     def UpdateTab(self,stocklist,recog_US):
-        recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
+        recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross','MACDBottomArc','MACDTopArc']
 
         resultTable=recog_US.resultTable
         for index,recogName in enumerate(recogList):
@@ -163,8 +170,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
             #增加的关于成功率的统计
             signalProbTable=stock.signalSucessProb
-            RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
-            RSIOverSell=signalProbTable['RSIOverSell'].iloc[0]
+            #RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
+            #RSIOverSell=signalProbTable['RSIOverSell'].iloc[0]
             KDJOverBuy=signalProbTable['KDJOverBuy'].iloc[0]
             KDJOverSell=signalProbTable['KDJOverSell'].iloc[0]
             KDJTopArcSignal=signalProbTable['KDJTopArcSignal'].iloc[0]
@@ -221,6 +228,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                     code = self.tableWidget_EMA5TOPArc.item(row, 1).text()
                 case 6:
                     code = self.tableWidget_EMADownCross.item(row, 1).text()
+                case 7:
+                    code = self.tableWidget_MACDBottomArc.item(row, 1).text()
+                case 8:
+                    code = self.tableWidget_MACDTopArc.item(row, 1).text()
                 case _:
                     return
 
@@ -246,6 +257,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 table = self.tableWidget_EMA5TOPArc
             case 6:
                 table = self.tableWidget_EMADownCross
+            case 7:
+                table = self.tableWidget_MACDBottomArc
+            case 8:
+                table = self.tableWidget_MACDTopArc
             case _:
                 return
 

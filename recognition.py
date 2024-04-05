@@ -41,7 +41,7 @@ pass
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
-    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
+    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','MACDBottomArc','MACDTopArc','EMADownCross',]
     def __init__(self):
         #必须声明为实例变量，放在外面就是类变量
         self.resultTable = pd.DataFrame(columns=self.recogProcList)
@@ -74,6 +74,10 @@ class Recognition:
                 dicBuff['EMA5BottomArc'] = self.EMA5BottomArc(stockInProcess)
                 #识别顶部圆弧
                 dicBuff['EMA5TOPArc'] = self.EMA5TOPArc(stockInProcess)
+                # 识别底部MACD弧
+                dicBuff['MACDBottomArc'] = self.MACDBottomArc(stockInProcess)
+                # 识别顶部MACD弧
+                dicBuff['MACDTopArc'] = self.MACDTopArc(stockInProcess)
                 # 识别顶部EMA均线死叉
                 dicBuff['EMADownCross'] = self.EMADownCross(stockInProcess)
 
@@ -512,7 +516,39 @@ class Recognition:
             print("不是弧形顶")
             return 0
 
- # 识别顶部的均线下穿
+    def MACDBottomArc(self, stock):
+        macd = stock.MACDData
+        resultArry = np.zeros(macd.shape[0])
+        # 需要考虑两边的情况，后续是看3日后的值，所以边界-3
+        arr = np.zeros(5)
+        for i in range(0, 3):
+            # 取最后3个
+            arr[i] = macd['BAR'].iloc[i- 3]
+        posMin = np.argmin(arr)
+        # 3个值都小于0
+        if posMin == 1:
+            print("弧形底")
+            return 1
+
+        print("不是弧形底")
+        return 0
+
+    def MACDTopArc(self, stock):
+        macd = stock.MACDData
+        resultArry = np.zeros(macd.shape[0])
+        # 需要考虑两边的情况，后续是看3日后的值，所以边界-3
+        arr = np.zeros(3)
+        for i in range(0, 3):
+            # 取最后3个
+            arr[i] = macd['BAR'].iloc[i - 3]
+        posMmax = np.argmax(arr)
+        # 3个值都小于0
+        if posMmax == 1:
+            print("弧形顶")
+            return 1
+        print("不是弧形顶")
+        return 0
+                            # 识别顶部的均线下穿
     def EMADownCross(self, stock):
         print(f'{stock.code}开始均线死叉识别顶部')
         trendlist = self.RecognizeTrend(stock)  # 判断下降趋势，
@@ -828,14 +864,14 @@ class TechIndex():
                 EmaCalEndDate = dayPriceDataIndex.ENDDATE
                 # 查询EMA取出前一个值并计算
                 for period in basic.emaPeriod:
-                    start_time = time.time()
+                    #start_time = time.time()
 
                     EMAFirst = self.session.query(database.ExpMA).filter(database.ExpMA.CODE == code,database.ExpMA.DATE==EMAIndexEndDate,database.ExpMA.PERIOD==period).first()
 
                     emaPreValueDict[period]=EMAFirst.EXPMA
-                    end_time = time.time()
+                    #end_time = time.time()
 
-                    print("耗时: {:.2f}秒".format(end_time - start_time))
+                    #print("耗时: {:.2f}秒".format(end_time - start_time))
 
                 #获取到各个周期第一个值后，获取darpricedata的值,并进行EMA的计算
 
@@ -1052,18 +1088,32 @@ class TechIndex():
                     dateSeris=outData['DATE']
                     dateSerisCut=dateSeris[24:]
                     #重置索引
+                    #给upsma和downsma前方添加数据，与日线数据对齐
+                    prefixArryUp=np.array([UPSMA[0]]*period)
+                    prefixArryDown=np.array([DOWNSMA[0]]*period)
+                    prefixSeriesUp=pd.Series(prefixArryUp)
+                    prefixSeriesDown=pd.Series(prefixArryDown)
+                    UPSMA=pd.concat([prefixSeriesUp,UPSMA],axis=0)
+                    DOWNSMA=pd.concat([prefixSeriesDown,DOWNSMA],axis=0)
+                    UPSMA.reset_index(inplace=True,drop=True)
+                    DOWNSMA.reset_index(inplace=True,drop=True)
+
+                    pass
+
+                    #不需要进行cut
+                    '''
                     dateSerisCut.reset_index(inplace=True,drop=True)
                     UPSMACut=UPSMA[(24-period):]
                     DOWNSMACut=DOWNSMA[(24-period):]
                     UPSMACut.reset_index(inplace=True,drop=True)
                     DOWNSMACut.reset_index(inplace=True,drop=True)
-
-                    SMACalResult['DATE'] = dateSerisCut
+                    '''
+                    SMACalResult['DATE'] = dateSeris
                     SMACalResult['CODE'] = code
                     SMACalResult['PERIOD'] = period
-                    SMACalResult['UPSMA'] = UPSMACut
-                    SMACalResult['DOWNSMA']=DOWNSMACut
-                    SMACalResult['RSI']=100*UPSMACut/(UPSMACut+DOWNSMACut)
+                    SMACalResult['UPSMA'] = UPSMA
+                    SMACalResult['DOWNSMA']=DOWNSMA
+                    SMACalResult['RSI']=100*UPSMA/(UPSMA+DOWNSMA)
                     concatDataframe = pd.concat([concatDataframe, SMACalResult])
 
                 # 写入数据库,并更新index
@@ -1071,8 +1121,8 @@ class TechIndex():
                 self.con.commit()
                 # 更新index的结果
                 #因为算出来比前面少一位，所以需要将起始位置减一天
-                RSIStartDate = dateSerisCut.iloc[0]
-                RSIEndDate = dateSerisCut.iloc[-1]
+                RSIStartDate = dateSeris.iloc[0]
+                RSIEndDate = dateSeris.iloc[-1]
                 self.UpdateTechIndex(self.session,code,RSIStartDate,dbEndDate,'rsi')
 
             #有日线数据也有RSI数据的情况下

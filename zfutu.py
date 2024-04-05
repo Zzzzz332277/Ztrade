@@ -49,11 +49,11 @@ class Zfutu():
     def __init__(self,market):
         self.market=market
         #ema diffusion先不做
-        self.recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross']
+        self.recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','MACDBottomArc','MACDTopArc','EMADownCross']
         if market=='HK':
-            self.listNameList=['backstepemaHK', 'EmaDiffusionHK','EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK','EMA5TOPArcHK','EMADownCrossHK']
+            self.listNameList=['backstepemaHK', 'EmaDiffusionHK','EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK','EMA5TOPArcHK','MACDTopArcHK','MACDBottomArcHK','EMADownCrossHK']
         elif market=='US':
-            self.listNameList= ['backstepemaUS', 'EmaDiffusionUS','EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS','EMA5TOPArcUS','EMADownCrossUS']
+            self.listNameList= ['backstepemaUS', 'EmaDiffusionUS','EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS','EMA5TOPArcUS','MACDBottomArcUS','MACDTopArcUS','EMADownCrossUS']
         else:
             print('市场输入错误')
             return

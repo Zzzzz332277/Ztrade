@@ -41,11 +41,11 @@ def ZtradeHK():
     codeDF = pd.read_csv("D:\ztrade\codes.csv")
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
-    startDate = date(2020, 1, 8)
-    endDate = date(2024,3, 4)
+    startDate = date(2020, 1, 2)
+    endDate = date(2024,3, 15)
     #endDate=date.today()
 
-    codeList=['3690.HK']
+    #codeList=['3690.HK']
 
     pass
     #使用数据库初始化
@@ -59,6 +59,8 @@ def ZtradeHK():
     #zft.ModifyFutuStockList(recog.resultTable)
     stg=strategy.Strategy()
     stg.SignalProcess(stocks)
+    stg.WriteToExcel()
+    pass
     '''
     for stock in stocks:
 
@@ -78,10 +80,10 @@ def ZtradeUS():
     codeDF = pd.read_csv("D:\ztrade\heatChartUS.csv",encoding="gb2312")
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
-
-    startDate = date(2019, 12, 22)
-    #endDate = date(2024, 2,29)
-    endDate=date.today()-timedelta(days=1)
+    #print(codeList)
+    startDate = date(2023, 1, 2)
+    endDate = date(2024, 3,15)
+    #endDate=date.today()-timedelta(days=1)
 
     #codeList=['AAPL.O']
 
@@ -92,6 +94,10 @@ def ZtradeUS():
     stocks_US = dtp_US.DataPreWindDB(codeList, startDate, endDate)
     #使用stock列表进行beta分析
     #result= index.BetaAnalyze(startDate,endDate,stocks_US)
+
+    stg = strategy.Strategy()
+    stg.SignalProcess(stocks_US)
+    stg.WriteToExcel()
     pass
     # 识别的类
     for stock in stocks_US:

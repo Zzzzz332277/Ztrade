@@ -2,7 +2,8 @@ import datetime
 from WindPy import *
 import sqlalchemy
 #from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date,DateTime,MetaData, ForeignKey, desc, inspect
+from sqlalchemy import text, create_engine, Table, Column, Integer, String, Float, Date, DateTime, MetaData, ForeignKey, \
+    desc, inspect, Index, UniqueConstraint
 import pymysql
 from sqlalchemy.orm import sessionmaker,declarative_base
 import pandas as pd
@@ -74,14 +75,18 @@ class StockCode(Base):
 class DayPriceData(Base):
     __tablename__ = 'DayPriceData'
     ID = Column(Integer, primary_key=True)
-    CODE = Column(String(60))
+    CODE = Column(String(60),index=True)
     # Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATE = Column(Date)
+    DATE = Column(Date,index=True)
     OPEN = Column(Float)
     CLOSE = Column(Float)
     HIGH = Column(Float)
     LOW = Column(Float)
     VOLUME = Column(Float)
+
+    __table_args__ = (
+        UniqueConstraint('CODE', 'DATE', name='CODE_DATE'),  # code和date唯一
+    )
 
 class MoneyFlowData(Base):
     __tablename__ = 'MoneyFlow'
@@ -97,30 +102,35 @@ class MoneyFlowData(Base):
 class ExpMA(Base):
     __tablename__ = 'ExpMA'
     ID = Column(Integer, primary_key=True)
-    CODE=Column(String(60))
+    CODE=Column(String(60),index=True)
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATE= Column(Date)
+    DATE= Column(Date,index=True)
     EXPMA= Column(Float)
-    PERIOD= Column(Integer)
-
+    PERIOD= Column(Integer,index=True)
+    #添加复合索引
+    '''
+    __table_args__ = (
+        Index('code_date_period', CODE, DATE,PERIOD),  # 普通复合索引, ser_cre是索引名
+    )
+    '''
 class MA(Base):
     __tablename__ = 'MA'
     ID = Column(Integer, primary_key=True)
-    CODE=Column(String(60))
+    CODE=Column(String(60),index=True)
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATE= Column(Date)
+    DATE= Column(Date,index=True)
     MA= Column(Float)
-    PERIOD= Column(Integer)
+    PERIOD= Column(Integer,index=True)
 
 class KDJ(Base):
     __tablename__ = 'KDJ'
     ID = Column(Integer, primary_key=True)
-    CODE=Column(String(60))
+    CODE=Column(String(60),index=True)
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATE= Column(Date)
+    DATE= Column(Date,index=True)
     K = Column(Float)
     D = Column(Float)
     J = Column(Float)
@@ -129,22 +139,22 @@ class KDJ(Base):
 class RSI(Base):
     __tablename__ = 'RSI'
     ID = Column(Integer, primary_key=True)
-    CODE=Column(String(60))
+    CODE=Column(String(60),index=True)
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATE= Column(Date)
+    DATE= Column(Date,index=True)
     UPSMA= Column(Float)
     DOWNSMA= Column(Float)
     RSI= Column(Float)
-    PERIOD= Column(Integer)
+    PERIOD= Column(Integer,index=True)
 
 class MACD(Base):
     __tablename__ = 'MACD'
     ID = Column(Integer, primary_key=True)
-    CODE=Column(String(60))
+    CODE=Column(String(60),index=True)
 
     #Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATE= Column(Date)
+    DATE= Column(Date,index=True)
     BAR= Column(Float)
     DIF= Column(Float)
     DEA = Column(Float)
@@ -155,7 +165,7 @@ class MACD(Base):
 class CodeDateIndex(Base):
     __tablename__ = 'CodeDateIndex'
     ID = Column(Integer, primary_key=True)
-    CODE=Column(String(60))
+    CODE=Column(String(60),index=True)
     STARTDATE= Column(Date)
     ENDDATE= Column(Date)
 
@@ -163,10 +173,10 @@ class CodeDateIndex(Base):
 class TechDateIndex(Base):
     __tablename__ = 'TechDateIndex'
     ID = Column(Integer, primary_key=True)
-    CODE = Column(String(60))
+    CODE = Column(String(60),index=True)
     STARTDATE = Column(Date)
     ENDDATE = Column(Date)
-    TECHINDEXTYPE = Column(String(60))
+    TECHINDEXTYPE = Column(String(60),index=True)
 
 class CapitalFlow(Base):
     __tablename__ = 'CapitalFlow'
@@ -187,7 +197,7 @@ class MinutePriceData(Base):
     ID = Column(Integer, primary_key=True)
     CODE = Column(String(60))
     # Code_ID=Column(Integer, ForeignKey('StockCode.Id'))
-    DATETIME = Column(DateTime)
+    DATETIME = Column(DateTime)           
     OPEN = Column(Float)
     CLOSE = Column(Float)
     HIGH = Column(Float)
@@ -352,6 +362,8 @@ class GetWindDaTA:
             if data.empty:
                 # 抛出无数据的异常
                 #raise myexception.ExceptionFutuNoData('Futu: No data.')
+                #未获取到数据也休眠，避免频繁调用接口
+                time.sleep(0.5)
                 return 0,0,0
             buffData = pd.DataFrame()
             timeStrSeries = data['time_key']
@@ -765,14 +777,19 @@ class GetWindDaTA:
 
         startDateStr = startdate.strftime('%Y-%m-%d')
         endDateStr = enddate.strftime('%Y-%m-%d')
-
+        #start_time = time.time()
         sql = f'select * from {type} where CODE in ({codeListStr}) AND DATE between "{startDateStr}" and "{endDateStr}"'
+
         # sql = "select * from daypricedata"
         # left join进行筛选带有expma的数据
         # sql = ‘select * from DayPriceData LEFT JOIN expma ON (DayPriceData.Date=expma.Date AND DayPriceData.Code = expma.Code_ID) where DayPriceData.Code in('1024.HK','3690.HK','0700.HK','0001.HK') AND DayPriceData.Date between "2023-06-01" and "2023-06-05"
         outData = pd.DataFrame()
         # 和tosql不一樣，一個用con用，egine，一個用con，
+
         outData = pd.read_sql(text(sql), con=self.con)
+        #end_time = time.time()
+
+        #print("耗时: {:.2f}秒".format(end_time - start_time))
         outData = outData.sort_values(by="DATE", ascending=True)
         return outData
 
@@ -1390,16 +1407,21 @@ class DataPrepare():
         #计算ema数据和kdj数据
         tix=recognition.TechIndex(self.con,self.engine,self.session,self.tradingCalendar)
         print('计算技术指标')
+
         tix.CalcKDJ(codelist)
         tix.CalAllEMAUpdate(codelist)
         tix.CalAllMAUpdate(codelist)
-        #tix.CalAllRSI(codelist)
+        tix.CalAllRSI(codelist)
         tix.CalAllMACD(codelist)
 
         #################################测试将数据存进去数据库###########################
         # complexData = gwd.GetTimePeriodData(codelist,startDate,endDate)
         # complexDataEMA =gwd.GetTimePeriodDataEMA(codelist,startDate,endDate)
+        start_time = time.time()
         complexData = gwd.GetDataBase(codelist, startdate, endate,'daypricedata')
+        end_time = time.time()
+
+        print("耗时: {:.2f}秒".format(end_time - start_time))
         complexDataEMA = gwd.GetDataBase(codelist, startdate, endate,'expma')
         complexDataMA= gwd.GetDataBase(codelist, startdate, endate,'ma')
         complexDataKDJ= gwd.GetDataBase(codelist, startdate, endate,'kdj')
