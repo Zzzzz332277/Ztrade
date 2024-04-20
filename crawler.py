@@ -7,6 +7,8 @@ import  traceback
 import re
 import ast
 import time
+from datetime import date, timedelta
+
 import crawler
 from selenium import webdriver
 from bs4 import BeautifulSoup
@@ -60,6 +62,11 @@ urlSZ='https://push2.eastmoney.com/api/qt/ulist.np/get?&fltt=2&secids=0.399001&f
 
 #北向资金：
 urlNorthMoney='https://datacenter-web.eastmoney.com/api/data/v1/get?&reportName=RPT_MUTUAL_QUOTA&columns=TRADE_DATE%2CMUTUAL_TYPE%2CBOARD_TYPE%2CMUTUAL_TYPE_NAME%2CFUNDS_DIRECTION%2CINDEX_CODE%2CINDEX_NAME%2CBOARD_CODE&quoteColumns=status~07~BOARD_CODE%2CdayNetAmtIn~07~BOARD_CODE%2CdayAmtRemain~07~BOARD_CODE%2CdayAmtThreshold~07~BOARD_CODE%2Cf104~07~BOARD_CODE%2Cf105~07~BOARD_CODE%2Cf106~07~BOARD_CODE%2Cf3~03~INDEX_CODE~INDEX_f3%2CnetBuyAmt~07~BOARD_CODE&quoteType=0&pageNumber=1&pageSize=200&sortTypes=1&sortColumns=MUTUAL_TYPE&source=WEB&client=WEB&_=1701937642492'
+
+#从yahoo Finance获取财经日历数据
+urlYahooEarningsCalenderHead='https://finance.yahoo.com/calendar/earnings?'
+tail='from=2024-04-14&to=2024-04-20&day=2024-04-16'
+
 
 def getHTMLText(url):
     code = 'UTF-8'
@@ -135,3 +142,27 @@ def GetNorthMoneyData(url):
     return totalMoney
 
 #GetNorthMoneyData(urlNorthMoney)
+
+def GetYahooEarningsCalenderData(date):
+    urlYahooEarningsCalenderHead = 'https://finance.yahoo.com/calendar/earnings?'
+    dateStr = date.strftime("%Y-%m-%d")
+    tail = 'day='+dateStr
+    url=urlYahooEarningsCalenderHead+tail
+    #print(f'获取{code}数据')
+
+    html=getHTMLText(url)
+    soup = BeautifulSoup(html, 'html.parser')
+    rows = soup.find_all('tr')
+    simbols=soup.find_all(name='a',attrs={'data-test':"quoteLink"})
+    nameList=list()
+    for simbol in simbols:
+        print(simbol.text)
+        nameList.append(simbol.text)
+    nameList=pd.Series(nameList)
+    nameList=nameList.drop_duplicates()
+
+    return nameList
+
+
+date = date(2024, 4, 18)
+GetYahooEarningsCalenderData(date)

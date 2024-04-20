@@ -1,51 +1,86 @@
+import time
+from datetime import datetime, timedelta
+
 import pandas as pd
-from futu import *
-#codeDF = pd.read_csv("D:\ztrade\heatChartUSbuff.csv", encoding="gb2312")
-#codeDFHeat = pd.read_csv("D:\ztrade\heatChart.csv", encoding="gb2312")
-# codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
-#codeDFHeat.rename(columns={'代码':'TRADE_CODE'},inplace=True)
-#set_diff_df = pd.concat([codeDFHeat, codeDF, codeDF]).drop_duplicates(keep=False)
+#import crawler
 
-#intersected_df = pd.merge(codeDF, codeDFHeat, on=['TRADE_CODE'], how='inner')
+import yfinance as yf
+from sqlalchemy import text
 
-#.to_csv("D:\ztrade\heatChartUS.csv", index_label="index_label")
-
-#codeDFHeat['WINDCODE']=''
+import database
 
 
-#codeList = codeDF['WindCodes'].tolist()
-quote_ctx = OpenQuoteContext(host='127.0.0.1', port=11111)
 
-ret, data, page_req_key = quote_ctx.request_history_kline('SH.000001', start='2019-09-11', end='2019-09-18', max_count=1000,page_req_key=None)  # 每页5个，请求第一页
-if ret == RET_OK:
-    print(data)
-    buffData=pd.DataFrame()
-    timeStrSeries=data['time_key']
-    timeDateList=[]
-    for timeStr in timeStrSeries:
-        timeDatetime = datetime.strptime(timeStr, '%Y-%m-%d %H:%M:%S')  # strptime()内参数必须为string格式
-        timeDate=datetime.date(timeDatetime)
-        timeDateList.append(timeDate)
+#程序思路：根据财报列表，获取过往的财报日，然后计算平均涨跌幅，yfiance的财报财报日中有盘前盘后信息
+def CalEarningsVol(code):
+    data = yf.Ticker(code)
+    earningsDate=data.earnings_dates
+    earningsDateHistory=earningsDate.dropna()
+    timeStamps=earningsDateHistory.index.tolist()
+    dateList=list()
+    timeList=list()
+    for timeStamp in timeStamps:
+        dt=timeStamp.to_pydatetime()
+        buffDate=dt.date()
+        buffTime=dt.time()
+        buffDateTime=datetime(2020,3,1,12,0)
+        compareTime=buffDateTime.time()
+        #根据时间判断是盘前盘后，这里也要考虑没有给出时间的情况
+        if buffTime>compareTime:
+            beforeAfter='after'
+        else:
+            beforeAfter = 'before'
+        dateList.append(buffDate)
+        timeList.append(beforeAfter)
+        #timeStamp=datetime.strptime(dt,"%Y-%m-%d %H:%M:%S")
+    #print(earningsDateHistory['Earnings Date'])
+    EarningsDateHistoryNew=pd.DataFrame(columns=['date','beforeafter'])
+    EarningsDateHistoryNew['date']=dateList
+    EarningsDateHistoryNew['beforeafter']=timeList
 
-    buffData['OPEN']=data['open']
-    buffData['CLOSE']=data['close']
-    buffData['HIGH']=data['high']
-    buffData['LOW']=data['low']
-    buffData['VOLUME']=data['volume']
-    buffData['DATE']=timeDateList
 
+    #准备数据，需要同步数据
+
+    #暂时先直接从数据库中查出，这里后面要改掉
+    code='TSLA.O'
+    volList=list()
+    for i in range(0,EarningsDateHistoryNew.shape[0]):
+        searchDate=EarningsDateHistoryNew['date'].iloc[i]
+        searchDateStr = searchDate.strftime("%Y%m%d")
+        beforeAfter=EarningsDateHistoryNew['beforeafter'].iloc[i]
+        #财报当天的股价数据,这里code要转化一下
+        dayPriceDataEarnDay = database.sessionUS.query(database.DayPriceData).filter(database.DayPriceData.CODE == code,database.DayPriceData.DATE==searchDate).first()
+        # 获取前后多一个星期的冗余数据进行
+        dbStartDate = searchDate - timedelta(days=7)
+        dbstartDateStr = dbStartDate.strftime('%Y-%m-%d')
+        dbEndDate = searchDate + timedelta(days=7)
+        dbendDateStr = dbEndDate.strftime('%Y-%m-%d')
+        sql = f'select * from daypricedata where CODE = "{code}" AND DATE between "{dbstartDateStr}" and "{dbendDateStr}"'
+        outData = pd.DataFrame()
+        outData = pd.read_sql(text(sql), con=database.conUS)
+        outData = outData.sort_values(by="DATE", ascending=True)
+        outData.reset_index(inplace=True, drop=True)
+
+        # 在数据中定位位置
+        pos = outData.loc[outData['DATE'] == searchDate].index[0]
+        if beforeAfter == 'before':
+            dayPriceDataEarnDay=outData.loc[pos]
+            dayPriceDataBefore=outData.loc[pos-1]
+        else:
+            dayPriceDataBefore = outData.loc[pos]
+            dayPriceDataEarnDay = outData.loc[pos + 1]
+        change=dayPriceDataEarnDay['OPEN']/dayPriceDataBefore['CLOSE'] -1
+        volList.append(change)
     pass
-    #print(data['code'][0])    # 取第一条的
-    # 股票代码
-    #print(data['close'].values.tolist())   # 第一页收盘价转为 list
-else:
-    print('error:', data)
-while page_req_key != None:  # 请求后面的所有结果
-    print('*************************************')
-    ret, data, page_req_key = quote_ctx.request_history_kline('HK.00700', start='2019-09-11', end='2019-09-18', max_count=5, page_req_key=page_req_key) # 请求翻页后的数据
-    if ret == RET_OK:
-        print(data)
-    else:
-        print('error:', data)
-print('All pages are finished!')
-quote_ctx.close() # 结束后记得关闭当条连接，防止连接条数用尽
+
+    #只保留
+
+
+def time_cmp(first_time, second_time):
+    print(first_time)
+    print(second_time)
+    return int(time.strftime("%H%M%S", first_time)) - int(time.strftime("%H%M%S", second_time))
+
+
+pass
+CalEarningsVol('tsla')

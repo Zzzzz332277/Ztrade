@@ -1,5 +1,5 @@
 import datetime
-from WindPy import *
+#from WindPy import *
 import sqlalchemy
 #from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import text, create_engine, Table, Column, Integer, String, Float, Date, DateTime, MetaData, ForeignKey, \

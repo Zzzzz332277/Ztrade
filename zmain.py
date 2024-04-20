@@ -3,7 +3,7 @@ import datetime
 
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal
-from WindPy import *
+#from WindPy import *
 from sqlalchemy import text
 
 #import matplotlib.pyplot as plt

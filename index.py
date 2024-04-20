@@ -3,7 +3,7 @@ import database
 import crawler
 import basic
 import recognition
-from WindPy import *
+#from WindPy import *
 import myexception
 import sqlalchemy
 import pandas as pd

@@ -8,7 +8,7 @@ from scipy import interpolate
 from scipy.misc import derivative
 import database
 import stockclass
-from WindPy import *
+#from WindPy import *
 import talib
 from sqlalchemy import text,create_engine, Table, Column, Integer, String, Float,Date, MetaData, ForeignKey, desc, inspect
 import basic

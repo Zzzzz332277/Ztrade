@@ -141,7 +141,7 @@ class Strategy():
         #writer.close()
 
     def LoadExcel(self,stocklist):
-        ProbDF = pd.read_csv("D:\ztrade\Analysis2020.1.1-2024.3.15_us.csv")
+        ProbDF = pd.read_csv("D:\ztrade\Analysis.csv")
         # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
         #将读取到的table分配给各个stock
         pass
