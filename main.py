@@ -92,11 +92,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def ZtradeUS(self):
         # f= open(, encoding="utf-8")
         TradeCalendar_US = 'NYSE'
-        codeDF = pd.read_csv("D:\ztrade\codes.csv", encoding="gb2312")
+        codeDF = pd.read_csv("D:\ztrade\heatChartUS.csv", encoding="gb2312")
         # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
-        codeList = codeDF['code'].tolist()
+        codeList = codeDF['WindCodes'].tolist()
 
-        startDate = date(2018, 1, 3)
+        startDate = date(2024, 1, 3)
         #endDate = date(2024, 3,15)
         endDate = date.today() - timedelta(days=1)
 
