@@ -149,6 +149,25 @@ class Strategy():
             stock.signalSucessProb=ProbDF[ProbDF['code']==stock.code]
 
 
+ #计算60日波动率
+    def CalVol60(self,stocklist):
+        for stock in stocklist:
+            dayPriceDate = stock.dayPriceData
+            dayPriceDate = dayPriceDate.sort_values(by="DATE", ascending=True)
+            len=dayPriceDate.shape[0]
+            if len>-60:
+                closeData60=dayPriceDate['CLOSE'].iloc[-60:]
+            #不满60天直接取全部
+            else:
+                closeData60=dayPriceDate['CLOSE']
+            logreturns = np.diff(np.log(closeData60))
+            # print(logreturns)
+            # 股票波动率：是对价格变动的一种衡量。
+            # 年股票波动率：对数收益率的标准差除以对数收益率的平均值，然后再除以252个工作日的倒数的平方根。
+            Volatility = np.std(logreturns) * np.sqrt(252)
+            #保留两位小数
+            stock.vol60='{:.2f}'.format(Volatility)
+
     def RSIOverBuySellSignal(self,stock,type):
         rsi = stock.RSIData
         resultArry = np.zeros(rsi.shape[0])

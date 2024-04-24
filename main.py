@@ -117,7 +117,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         stg_us=strategy.Strategy()
         #stg_us.SignalProcess(stocks_US)
         stg_us.LoadExcel(stocks_US)
-
+        stg_us.CalVol60(stocks_US)
 
         zft_US = zfutu.Zfutu(market='US')
         zft_US.ModifyFutuStockList(recog_US.resultTable)
@@ -167,7 +167,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             volume=dayPriceData['VOLUME'].iloc[-1]
             changePct=format(100*(close-open)/open,'.2f')
             changePctStr=str(changePct)+'%'
-
+            vol60=stock.vol60
             #增加的关于成功率的统计
             signalProbTable=stock.signalSucessProb
             #RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
@@ -188,17 +188,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             table.setItem(row_count - 1, 2, QtWidgets.QTableWidgetItem(str(close)))
             table.setItem(row_count - 1, 3, QtWidgets.QTableWidgetItem(changePctStr))
             table.setItem(row_count - 1, 4, QtWidgets.QTableWidgetItem(str(volume)))
+            table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(vol60)))
 
             #table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(RSIOverBuy)))
             #table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(str(RSIOverSell)))
-            table.setItem(row_count - 1, 7, QtWidgets.QTableWidgetItem(str(KDJOverBuy)))
-            table.setItem(row_count - 1, 8, QtWidgets.QTableWidgetItem(str(KDJOverSell)))
-            table.setItem(row_count - 1, 9, QtWidgets.QTableWidgetItem(str(KDJTopArcSignal)))
-            table.setItem(row_count - 1, 10, QtWidgets.QTableWidgetItem(str(KDJBottomArcSignal)))
-            table.setItem(row_count - 1, 11, QtWidgets.QTableWidgetItem(str(EMA5TopArcSignal)))
-            table.setItem(row_count - 1, 12, QtWidgets.QTableWidgetItem(str(EMA5BottomArcSignal)))
-            table.setItem(row_count - 1, 13, QtWidgets.QTableWidgetItem(str(MACDTopArcSignal)))
-            table.setItem(row_count - 1, 14, QtWidgets.QTableWidgetItem(str(MACDBottomArcSignal)))
+            table.setItem(row_count - 1, 8, QtWidgets.QTableWidgetItem(str(KDJOverBuy)))
+            table.setItem(row_count - 1, 9, QtWidgets.QTableWidgetItem(str(KDJOverSell)))
+            table.setItem(row_count - 1, 10, QtWidgets.QTableWidgetItem(str(KDJTopArcSignal)))
+            table.setItem(row_count - 1, 11, QtWidgets.QTableWidgetItem(str(KDJBottomArcSignal)))
+            table.setItem(row_count - 1, 12, QtWidgets.QTableWidgetItem(str(EMA5TopArcSignal)))
+            table.setItem(row_count - 1, 13, QtWidgets.QTableWidgetItem(str(EMA5BottomArcSignal)))
+            table.setItem(row_count - 1, 14, QtWidgets.QTableWidgetItem(str(MACDTopArcSignal)))
+            table.setItem(row_count - 1, 15, QtWidgets.QTableWidgetItem(str(MACDBottomArcSignal)))
 
 
 

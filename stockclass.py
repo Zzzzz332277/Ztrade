@@ -43,6 +43,8 @@ class StockClass:
         self.signalTable= pd.DataFrame()
         self.signalSucessProb= pd.DataFrame()
 
+        #60日波动率
+        self.vol60=0
         '''
         暂时先不用ema跑流程
         # 更新EMA数据

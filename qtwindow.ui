@@ -63,7 +63,7 @@
      <enum>Qt::CustomContextMenu</enum>
     </property>
     <property name="currentIndex">
-     <number>8</number>
+     <number>4</number>
     </property>
     <widget class="QWidget" name="backstepema">
      <attribute name="title">
@@ -109,6 +109,11 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>波动率60</string>
        </property>
       </column>
       <column>
@@ -211,6 +216,11 @@
       </column>
       <column>
        <property name="text">
+        <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
         <string>RSIOverBuy</string>
        </property>
       </column>
@@ -305,6 +315,11 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>波动率60</string>
        </property>
       </column>
       <column>
@@ -407,6 +422,11 @@
       </column>
       <column>
        <property name="text">
+        <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
         <string>RSIOverBuy</string>
        </property>
       </column>
@@ -501,6 +521,11 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>波动率60</string>
        </property>
       </column>
       <column>
@@ -603,6 +628,11 @@
       </column>
       <column>
        <property name="text">
+        <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
         <string>RSIOverBuy</string>
        </property>
       </column>
@@ -697,6 +727,11 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>波动率60</string>
        </property>
       </column>
       <column>
@@ -799,6 +834,11 @@
       </column>
       <column>
        <property name="text">
+        <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
         <string>RSIOverBuy</string>
        </property>
       </column>
@@ -893,6 +933,11 @@
       <column>
        <property name="text">
         <string>成交量</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>波动率60</string>
        </property>
       </column>
       <column>
