@@ -20,6 +20,8 @@ from futu import *
 import main
 import strategy
 import backtest
+from datetime import date, timedelta
+
 ################################################################################################
 # 程序开始的地方，后面需要加入__main__的判断
 ################################################################################################
@@ -28,8 +30,9 @@ if __name__ == '__main__':
     #zmain.BackTest()
     #zmain.ZtradeHK()
 
-    zmain.ZtradeUS()
+    #zmain.ZtradeUS()
     #zmain.AindexAnalyze()
+    zmain.USIndex()
 
     pass
 
@@ -165,3 +168,15 @@ def BackTest():
     print(f'成功率为：{prob},单次累加收益率为{AccumGain},复利收益率为{cashReturn},交易笔数为{tradeTimes}')
 
     pass
+
+def USIndex():
+    TradeCalendar_US = 'NYSE'
+
+    indexCodesUS = ['^NDX', '^DJI', '^SPX']
+    startDate = date(2024, 2, 3)
+    # endDate = date(2024, 3,15)
+    #endDate = date.today() - timedelta(days=1)
+    endDate = date.today()
+
+    gwdIndex = database.GetWindDaTA(database.conUS, database.engineUS, database.sessionUS, TradeCalendar_US)
+    gwdIndex.SyncDataBaseDayPirceDataYFinance(indexCodesUS, startDate, endDate,'daypricedata')

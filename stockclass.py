@@ -45,7 +45,11 @@ class StockClass:
 
         #60日波动率
         self.vol60=0
+        # 和指数相关性
+        self.CorrelationUS=[]
         '''
+        
+        
         暂时先不用ema跑流程
         # 更新EMA数据
         self.EMA['ema5'] = talib.EMA(self.StockDataFrame['CLOSE'], timeperiod=5)

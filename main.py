@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QGraphicsWi
     QMenu
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+import basic
 import strategy
 # Form implementation generated from reading ui file 'qtwindow.ui'
 #
@@ -93,8 +94,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # f= open(, encoding="utf-8")
         TradeCalendar_US = 'NYSE'
         codeDF = pd.read_csv("D:\ztrade\heatChartUS.csv", encoding="gb2312")
-        # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
+        #codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
         codeList = codeDF['WindCodes'].tolist()
+        #美股三大指数
+        indexCodesUS=['^NDX','^DJI','^SPX']
+        #indexCodesUS=['^SPX']
 
         startDate = date(2024, 1, 3)
         #endDate = date(2024, 3,15)
@@ -106,6 +110,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         dtp_US = database.DataPrepare(database.conUS, database.engineUS, database.sessionUS, TradeCalendar_US)
         # 准备好待处理的stock类
         stocks_US = dtp_US.DataPreWindDB(codeList, startDate, endDate)
+        #单独为指数准备的gwd类
+        #gwdIndex = database.GetWindDaTA(database.conUS, database.engineUS, database.sessionUS, TradeCalendar_US)
+        #gwdIndex.SyncDataBaseDayPirceDataYFinance(indexCodesUS, startDate, endDate,'daypricedata')
+        index_US=dtp_US.DataPreWindDB(indexCodesUS, startDate, endDate)
         # 使用stock列表进行beta分析
         # result= index.BetaAnalyze(startDate,endDate,stocks_US)
         pass
@@ -118,6 +126,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         #stg_us.SignalProcess(stocks_US)
         stg_us.LoadExcel(stocks_US)
         stg_us.CalVol60(stocks_US)
+        stg_us.CalCorrelation60(stocks_US,index_US)
 
         zft_US = zfutu.Zfutu(market='US')
         zft_US.ModifyFutuStockList(recog_US.resultTable)
@@ -168,6 +177,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             changePct=format(100*(close-open)/open,'.2f')
             changePctStr=str(changePct)+'%'
             vol60=stock.vol60
+            #取最大的那个相关性,指数名称+数字
+            CorrelationUS=stock.CorrelationUS[0]+':'+str(format(stock.CorrelationUS[1],'.2f'))
             #增加的关于成功率的统计
             signalProbTable=stock.signalSucessProb
             #RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
@@ -189,17 +200,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             table.setItem(row_count - 1, 3, QtWidgets.QTableWidgetItem(changePctStr))
             table.setItem(row_count - 1, 4, QtWidgets.QTableWidgetItem(str(volume)))
             table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(vol60)))
+            table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(CorrelationUS))
 
             #table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(RSIOverBuy)))
             #table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(str(RSIOverSell)))
-            table.setItem(row_count - 1, 8, QtWidgets.QTableWidgetItem(str(KDJOverBuy)))
-            table.setItem(row_count - 1, 9, QtWidgets.QTableWidgetItem(str(KDJOverSell)))
-            table.setItem(row_count - 1, 10, QtWidgets.QTableWidgetItem(str(KDJTopArcSignal)))
-            table.setItem(row_count - 1, 11, QtWidgets.QTableWidgetItem(str(KDJBottomArcSignal)))
-            table.setItem(row_count - 1, 12, QtWidgets.QTableWidgetItem(str(EMA5TopArcSignal)))
-            table.setItem(row_count - 1, 13, QtWidgets.QTableWidgetItem(str(EMA5BottomArcSignal)))
-            table.setItem(row_count - 1, 14, QtWidgets.QTableWidgetItem(str(MACDTopArcSignal)))
-            table.setItem(row_count - 1, 15, QtWidgets.QTableWidgetItem(str(MACDBottomArcSignal)))
+            table.setItem(row_count - 1, 9, QtWidgets.QTableWidgetItem(str(KDJOverBuy)))
+            table.setItem(row_count - 1, 10, QtWidgets.QTableWidgetItem(str(KDJOverSell)))
+            table.setItem(row_count - 1, 11, QtWidgets.QTableWidgetItem(str(KDJTopArcSignal)))
+            table.setItem(row_count - 1, 12, QtWidgets.QTableWidgetItem(str(KDJBottomArcSignal)))
+            table.setItem(row_count - 1, 13, QtWidgets.QTableWidgetItem(str(EMA5TopArcSignal)))
+            table.setItem(row_count - 1, 14, QtWidgets.QTableWidgetItem(str(EMA5BottomArcSignal)))
+            table.setItem(row_count - 1, 16, QtWidgets.QTableWidgetItem(str(MACDTopArcSignal)))
+            table.setItem(row_count - 1, 16, QtWidgets.QTableWidgetItem(str(MACDBottomArcSignal)))
 
 
 

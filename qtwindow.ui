@@ -17,8 +17,8 @@
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>0</x>
-      <y>570</y>
+      <x>1190</x>
+      <y>260</y>
       <width>75</width>
       <height>23</height>
      </rect>
@@ -30,8 +30,8 @@
    <widget class="QTextBrowser" name="textBrowser">
     <property name="geometry">
      <rect>
-      <x>0</x>
-      <y>300</y>
+      <x>1190</x>
+      <y>0</y>
       <width>181</width>
       <height>251</height>
      </rect>
@@ -40,8 +40,8 @@
    <widget class="QPushButton" name="showCandle">
     <property name="geometry">
      <rect>
-      <x>100</x>
-      <y>570</y>
+      <x>1270</x>
+      <y>260</y>
       <width>75</width>
       <height>23</height>
      </rect>
@@ -55,7 +55,7 @@
      <rect>
       <x>10</x>
       <y>0</y>
-      <width>651</width>
+      <width>1161</width>
       <height>281</height>
      </rect>
     </property>
@@ -63,7 +63,7 @@
      <enum>Qt::CustomContextMenu</enum>
     </property>
     <property name="currentIndex">
-     <number>4</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="backstepema">
      <attribute name="title">
@@ -74,7 +74,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1171</width>
         <height>241</height>
        </rect>
       </property>
@@ -114,6 +114,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -177,7 +182,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -217,6 +222,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -280,7 +290,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -320,6 +330,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -383,7 +398,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -423,6 +438,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -486,7 +506,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -526,6 +546,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -589,7 +614,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -629,6 +654,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -692,7 +722,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1171</width>
         <height>241</height>
        </rect>
       </property>
@@ -732,6 +762,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -795,7 +830,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -835,6 +870,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -898,7 +938,7 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>701</width>
+        <width>1161</width>
         <height>241</height>
        </rect>
       </property>
@@ -938,6 +978,11 @@
       <column>
        <property name="text">
         <string>波动率60</string>
+       </property>
+      </column>
+      <column>
+       <property name="text">
+        <string>相关性</string>
        </property>
       </column>
       <column>
@@ -996,10 +1041,10 @@
    <widget class="QGraphicsView" name="graphicsView">
     <property name="geometry">
      <rect>
-      <x>660</x>
-      <y>0</y>
+      <x>10</x>
+      <y>300</y>
       <width>1221</width>
-      <height>851</height>
+      <height>621</height>
      </rect>
     </property>
    </widget>

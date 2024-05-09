@@ -164,5 +164,5 @@ def GetYahooEarningsCalenderData(date):
     return nameList
 
 
-date = date(2024, 4, 18)
-GetYahooEarningsCalenderData(date)
+#date = date(2024, 4, 18)
+#GetYahooEarningsCalenderData(date)

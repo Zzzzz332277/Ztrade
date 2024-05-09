@@ -13,6 +13,8 @@ emaPeriod = [5, 10, 20, 30, 60, 120, 250]
 maPeriod = [3, 6, 12, 24]
 rsiPeriod=[6, 12, 24]
 # 存储所有的港股通代码
+indexCodesUS = ['^NDX','^DJI','^SPX']
+
 codeHK = ['0001.HK',
           '0002.HK',
           '0003.HK',

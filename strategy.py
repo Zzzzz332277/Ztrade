@@ -168,6 +168,65 @@ class Strategy():
             #保留两位小数
             stock.vol60='{:.2f}'.format(Volatility)
 
+    #计算和指数的相关性：
+
+    def CalCorrelation60(self,stocklist,indexlist):
+        #准备指数
+        #IndexList=['NDX', 'DJI', 'SPX']
+
+        for stock in stocklist:
+            #用于判断最大值的list
+            rList=[]
+            #绝对值
+            rAbsList= []
+            keyList=[]
+            for index in indexlist:
+                dayPriceData = stock.dayPriceData
+                dayPriceData = dayPriceData.sort_values(by="DATE", ascending=True)
+                #通过merge来找出和指数相同日期的值
+                dayPriceDataMerge=dayPriceData.merge(index.dayPriceData,on='DATE',how='inner')
+                lenth=dayPriceDataMerge.shape[0]
+                if lenth > 60:
+                    #closeData60 = dayPriceData['CLOSE'].iloc[-60:]
+                    index_close = index.dayPriceData['CLOSE'].iloc[-60:]
+                    index_pct = index_close.pct_change()
+
+                    stock_close = dayPriceDataMerge['CLOSE_x'].iloc[-60:]
+                    stock_pct = stock_close.pct_change()
+                    # 不满60天直接取全部
+                else:
+                    index_close = index.dayPriceData['CLOSE']
+                    index_pct = index_close.pct_change()
+
+                    stock_close = dayPriceDataMerge['CLOSE_x']
+                    stock_pct = stock_close.pct_change()
+
+                '''
+                # 判断是否相等
+                if len(index_close) != len(stock_close):
+                    print(f'{stock.code}数据不完整')
+                    return 0, 0
+                '''
+                r_Matrix = np.corrcoef(index_close, stock_close)
+                r = r_Matrix[0][1]
+                covr_Matrix = np.cov(stock_pct[1:], index_pct[1:])
+                covr = covr_Matrix[0][1]
+                index_var = np.var(index_pct[1:])
+                beta = covr / index_var
+                #根据定位定位到字典中的对应项
+                #stock.CorrelationUS[index.dayPriceData['CODE'].iloc[0]]=r
+                rList.append(r)
+                rAbsList.append(abs(r))
+                code=index.dayPriceData['CODE'].iloc[0]
+                keyList.append(code)
+
+            # 求列表最大值及索引
+            max_value = max(rAbsList)  # 求列表最大值
+            max_idx = rAbsList.index(max_value)  # 求最大值对应索引
+            stock.CorrelationUS.append(keyList[max_idx])
+            stock.CorrelationUS.append(rList[max_idx])
+
+
     def RSIOverBuySellSignal(self,stock,type):
         rsi = stock.RSIData
         resultArry = np.zeros(rsi.shape[0])
@@ -316,6 +375,7 @@ class Strategy():
             return SignalProb
         else:
             return 99
+
     #只用daypricedata
     def CalSignalProbabilityOnlyData(self, resultarry, daypricedata,direction):
         success = 0

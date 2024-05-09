@@ -41,4 +41,95 @@ def plotCandle(code):
     fig,axlist=mpf.plot(data, type="candle",title=str(code),style=my_style,volume=True,returnfig=True,figscale=1.48)
     return  fig,axlist
 
-#plotCandle('TSLA.O')
+
+'''
+ #这里替换为自己写的函数
+        collections = _construct_candlestick_collections_zplot(xdates, opens, highs, lows, closes,volumes,
+                                                         marketcolors=style['marketcolors'],config=config )
+                                                         
+                                                         
+'''
+'''
+#进行修改，能够输出一个宽度变化的K线图
+def _construct_candlestick_collections_zplot(dates, opens, highs, lows, closes,volumes, marketcolors=None, config=None):
+    """Represent the open, close as a bar line and high low range as a
+    vertical line.
+
+    NOTE: this code assumes if any value open, low, high, close is
+    missing they all are missing
+
+
+    Parameters
+    ----------
+    opens : sequence
+        sequence of opening values
+    highs : sequence
+        sequence of high values
+    lows : sequence
+        sequence of low values
+    closes : sequence
+        sequence of closing values
+    marketcolors : dict of colors: up, down, edge, wick, alpha
+    alpha : float
+        bar transparency
+
+    Returns
+    -------
+    ret : list
+        (lineCollection, barCollection)
+    """
+
+    _check_input(opens, highs, lows, closes)
+
+    if marketcolors is None:
+        marketcolors = _get_mpfstyle('classic')['marketcolors']
+
+    datalen = len(dates)
+
+    avg_dist_between_points = (dates[-1] - dates[0]) / float(datalen)
+
+    delta = config['_width_config']['candle_width'] / 2.0
+
+    #根据volume计算寻找合适的宽度,采用平均
+    volumeMax=np.mean(volumes)
+    widthRatio=1
+    barVerts = [((date - delta*widthRatio*(volume/volumeMax), open),
+                 (date - delta*widthRatio*(volume/volumeMax), close),
+                 (date + delta*widthRatio*(volume/volumeMax), close),
+                 (date + delta*widthRatio*(volume/volumeMax), open))
+                for date, open, close,volume in zip(dates, opens, closes,volumes)]
+
+    rangeSegLow = [((date, low), (date, min(open, close)))
+                   for date, low, open, close in zip(dates, lows, opens, closes)]
+
+    rangeSegHigh = [((date, high), (date, max(open, close)))
+                    for date, high, open, close in zip(dates, highs, opens, closes)]
+
+    rangeSegments = rangeSegLow + rangeSegHigh
+
+    alpha = marketcolors['alpha']
+
+    overrides = config['marketcolor_overrides']
+    faceonly = config['mco_faceonly']
+
+    colors = _make_updown_color_list('candle', marketcolors, opens, closes, overrides)
+    colors = [_mpf_to_rgba(c, alpha) for c in colors]  # include alpha
+    if faceonly: overrides = None
+    edgecolor = _make_updown_color_list('edge', marketcolors, opens, closes, overrides)
+    wickcolor = _make_updown_color_list('wick', marketcolors, opens, closes, overrides)
+
+    lw = config['_width_config']['candle_linewidth']
+
+    rangeCollection = LineCollection(rangeSegments,
+                                     colors=wickcolor,
+                                     linewidths=lw,
+                                     )
+
+    barCollection = PolyCollection(barVerts,
+                                   facecolors=colors,
+                                   edgecolors=edgecolor,
+                                   linewidths=lw
+                                   )
+
+    return [rangeCollection, barCollection]
+'''
