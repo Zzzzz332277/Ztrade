@@ -118,15 +118,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # result= index.BetaAnalyze(startDate,endDate,stocks_US)
         pass
         # 识别的类
+        # 先计算波动率，去除掉波动率较低的股票
+        stg_us = strategy.Strategy()
+        # stg_us.SignalProcess(stocks_US)
+        stg_us.LoadExcel(stocks_US)
+        stg_us.CalVol60(stocks_US)
+        stg_us.CalCorrelation60(stocks_US, index_US)
+
 
         recog_US = recognition.Recognition()
         recog_US.RecognitionProcess(stocks_US)
 
-        stg_us=strategy.Strategy()
-        #stg_us.SignalProcess(stocks_US)
-        stg_us.LoadExcel(stocks_US)
-        stg_us.CalVol60(stocks_US)
-        stg_us.CalCorrelation60(stocks_US,index_US)
 
         zft_US = zfutu.Zfutu(market='US')
         zft_US.ModifyFutuStockList(recog_US.resultTable)

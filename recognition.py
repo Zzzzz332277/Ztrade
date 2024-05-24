@@ -260,6 +260,9 @@ class Recognition:
             if stock.dayPriceData['VOLUME'].iloc[-1]>stock.dayPriceData['VOLUME'].iloc[-2]:
                 print('最后一根增量下跌，不符合')
                 return 0
+        #进行波动率筛选,低于33%波动率筛选掉：
+        if float(stock.vol60)<0.33:
+            return 0
 
         if stock.EMAData['EMA5'].iloc[-1] > stock.EMAData['EMA10'].iloc[-1]:
             if stock.EMAData['EMA10'].iloc[-1] > stock.EMAData['EMA20'].iloc[-1]:
