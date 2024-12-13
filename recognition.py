@@ -54,6 +54,12 @@ class Recognition:
             turnVolumeTresh=5000000 #500万
             lastClose=stockInProcess.dayPriceData['CLOSE'].iloc[-1]
             lastVolume=stockInProcess.dayPriceData['VOLUME'].iloc[-1]
+            #加入波动率超过40的判断
+            vol60 = stock.vol60
+            # 只插入波动率比40大的
+            if float(vol60) < 0.4:
+                continue
+
             #成交量超过500万才进行判断
             if lastClose*lastVolume>=turnVolumeTresh:
                 t1=time.time()

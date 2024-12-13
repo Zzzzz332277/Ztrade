@@ -8,6 +8,7 @@ import re
 import ast
 import time
 from datetime import date, timedelta
+import tushare as ts
 
 import crawler
 from selenium import webdriver
@@ -16,6 +17,10 @@ from bs4 import BeautifulSoup
 false = False
 true = True
 null = ''
+#tushare的token
+tsToken='3880653d7eb80cedfc2e733ddf7d45ed0cfa9a46872125399cea0348'
+
+
 
 EastmoneyCodeDic={
         '外盘':"f49",
@@ -67,6 +72,35 @@ urlNorthMoney='https://datacenter-web.eastmoney.com/api/data/v1/get?&reportName=
 urlYahooEarningsCalenderHead='https://finance.yahoo.com/calendar/earnings?'
 tail='from=2024-04-14&to=2024-04-20&day=2024-04-16'
 
+def GetTushare():
+    ts.set_token(tsToken)
+    pro = ts.pro_api()
+    '''
+    df = pro.stock_company(**{
+        "ts_code": "",
+        "exchange": "",
+        "status": "",
+        "limit": "",
+        "offset": ""
+    }, fields=[
+        "ts_code",
+        "exchange",
+        "chairman",
+        "manager",
+        "secretary",
+        "reg_capital",
+        "setup_date",
+        "province",
+        "city",
+        "business_scope",
+        "main_business"
+    ])
+    '''
+    df = pro.query('trade_cal', exchange='', start_date='20180901', end_date='20181001',
+                   fields='exchange,cal_date,is_open,pretrade_date', is_open='0')
+
+    print(df)
+    pass
 
 def getHTMLText(url):
     code = 'UTF-8'
@@ -166,3 +200,4 @@ def GetYahooEarningsCalenderData(date):
 
 #date = date(2024, 4, 18)
 #GetYahooEarningsCalenderData(date)
+##GetTushare()

@@ -175,6 +175,7 @@ class Strategy():
         #IndexList=['NDX', 'DJI', 'SPX']
 
         for stock in stocklist:
+            print(f'计算{stock.code}')
             #用于判断最大值的list
             rList=[]
             #绝对值

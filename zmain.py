@@ -30,9 +30,9 @@ if __name__ == '__main__':
     #zmain.BackTest()
     #zmain.ZtradeHK()
 
-    #zmain.ZtradeUS()
+    zmain.ZtradeUS()
     #zmain.AindexAnalyze()
-    zmain.USIndex()
+    #zmain.USIndex()
 
     pass
 
@@ -80,12 +80,12 @@ def ZtradeHK():
 def ZtradeUS():
     # f= open(, encoding="utf-8")
     TradeCalendar_US='NYSE'
-    codeDF = pd.read_csv("D:\ztrade\heatChartUS.csv",encoding="gb2312")
+    codeDF = pd.read_csv("D:\ztrade\codeustemp.csv",encoding="gb2312")
     # codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
     codeList = codeDF['WindCodes'].tolist()
     #print(codeList)
-    startDate = date(2023, 1, 2)
-    endDate = date(2024, 3,15)
+    startDate = date(2024, 1, 3)
+    endDate = date(2024, 6,15)
     #endDate=date.today()-timedelta(days=1)
 
     #codeList=['AAPL.O']

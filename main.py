@@ -93,9 +93,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def ZtradeUS(self):
         # f= open(, encoding="utf-8")
         TradeCalendar_US = 'NYSE'
-        codeDF = pd.read_csv("D:\ztrade\heatChartUS.csv", encoding="gb2312")
+        codeDF = pd.read_csv("D:\ztrade\codesUS.csv", encoding="gb2312")
         #codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
         codeList = codeDF['WindCodes'].tolist()
+        #codeList = ['AAPL.O']
         #美股三大指数
         indexCodesUS=['^NDX','^DJI','^SPX']
         #indexCodesUS=['^SPX']
@@ -120,7 +121,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # 识别的类
         # 先计算波动率，去除掉波动率较低的股票
         stg_us = strategy.Strategy()
-        # stg_us.SignalProcess(stocks_US)
+        #stg_us.SignalProcess(stocks_US)
         stg_us.LoadExcel(stocks_US)
         stg_us.CalVol60(stocks_US)
         stg_us.CalCorrelation60(stocks_US, index_US)
@@ -171,6 +172,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # df = pd.DataFrame(data)  # 这里默认的 index 就是 range(n)，n 是列表的长度
 
         for stock in stocklist:
+            #print(f'更新{stock.code}')
             dayPriceData=stock.dayPriceData
             close=dayPriceData['CLOSE'].iloc[-1]
             code=dayPriceData['CODE'].iloc[-1]
@@ -179,12 +181,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             changePct=format(100*(close-open)/open,'.2f')
             changePctStr=str(changePct)+'%'
             vol60=stock.vol60
+            #只插入波动率比30大的
+            if float(vol60)<0.3:
+                continue
+
             #取最大的那个相关性,指数名称+数字
             CorrelationUS=stock.CorrelationUS[0]+':'+str(format(stock.CorrelationUS[1],'.2f'))
             #增加的关于成功率的统计
             signalProbTable=stock.signalSucessProb
             #RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
             #RSIOverSell=signalProbTable['RSIOverSell'].iloc[0]
+            '''
             KDJOverBuy=signalProbTable['KDJOverBuy'].iloc[0]
             KDJOverSell=signalProbTable['KDJOverSell'].iloc[0]
             KDJTopArcSignal=signalProbTable['KDJTopArcSignal'].iloc[0]
@@ -193,7 +200,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             EMA5BottomArcSignal=signalProbTable['EMA5BottomArcSignal'].iloc[0]
             MACDTopArcSignal=signalProbTable['MACDTopArcSignal'].iloc[0]
             MACDBottomArcSignal=signalProbTable['MACDBottomArcSignal'].iloc[0]
-
+            '''
             row_count = table.rowCount()  # 返回当前行数(尾部)
             table.insertRow(row_count)  # 尾部插入一行
             table.setItem(row_count-1, 0, QtWidgets.QTableWidgetItem(str(code)))
@@ -206,6 +213,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
             #table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(RSIOverBuy)))
             #table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(str(RSIOverSell)))
+            '''
             table.setItem(row_count - 1, 9, QtWidgets.QTableWidgetItem(str(KDJOverBuy)))
             table.setItem(row_count - 1, 10, QtWidgets.QTableWidgetItem(str(KDJOverSell)))
             table.setItem(row_count - 1, 11, QtWidgets.QTableWidgetItem(str(KDJTopArcSignal)))
@@ -214,7 +222,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             table.setItem(row_count - 1, 14, QtWidgets.QTableWidgetItem(str(EMA5BottomArcSignal)))
             table.setItem(row_count - 1, 16, QtWidgets.QTableWidgetItem(str(MACDTopArcSignal)))
             table.setItem(row_count - 1, 16, QtWidgets.QTableWidgetItem(str(MACDBottomArcSignal)))
-
+            '''
 
 
 

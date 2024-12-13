@@ -18,9 +18,17 @@ if ret == RET_OK:
     print(data)  # 返回 success
 else:
     print('error:', data)
+
+operationList = ['operation']
+
+ret, data = quote_ctx.get_user_security(operationList[0])
+if ret == RET_OK:
+    codeListMoveOut=data['code'].tolist()
+    pass
+    # print(data)  # 返回 success
+else:
+    print('error:', data)
 '''
-
-
 
 #用于转化单个code的函数
 def CodeTransWind2FUTU(code):
@@ -82,6 +90,11 @@ class Zfutu():
         codeListEveryDayWatch = everyDayWatchData['code'].tolist()
 
         ##################################################先讲原先的list清除########################
+        #因为增加operation分类，需要单独将operation清除
+        operationList=['operation']
+        self.CleanOutFUTUList(operationList)
+        time.sleep(3)
+
         self.CleanOutFUTUList(self.listNameList)
         print('等待30S，防止调用futu接口过于频繁')
         time.sleep(30)
@@ -93,8 +106,22 @@ class Zfutu():
             codeList=resultTableSliced['code'].tolist()
             codelistNew=self.CodeTransferWind2FUTU(codeList)
             self.AddFutuList(listname=self.listNameList[index],list=codelistNew)
-            time.sleep(1)
+            time.sleep(3)
             #这里加入等待避免超出接口限制
+
+            ############
+            #增加添加进入特别观察名单
+            #这里分为只做多和只做空两种
+            #只做多：
+            longTypeList= ['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc']
+            #只做空
+            shortTypeList=['EMA5TOPArc','MACDTopArc','EMADownCross']
+            totalList=['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc','EMA5TOPArc','MACDTopArc','EMADownCross']
+
+            if recogName in totalList:
+                self.AddFutuList(listname='SpecialFocus',list=codelistNew)
+                time.sleep(3)
+
         ###################################再恢复每日关注的股票#####################################
         self.AddFutuList(listname=watchList, list=codeListEveryDayWatch)
 
