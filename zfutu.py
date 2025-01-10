@@ -93,7 +93,7 @@ class Zfutu():
         #因为增加operation分类，需要单独将operation清除
         operationList=['operation']
         self.CleanOutFUTUList(operationList)
-        time.sleep(3)
+        time.sleep(10)
 
         self.CleanOutFUTUList(self.listNameList)
         print('等待30S，防止调用futu接口过于频繁')
