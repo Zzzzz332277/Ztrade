@@ -116,9 +116,9 @@ class Zfutu():
             longTypeList= ['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc']
             #只做空
             shortTypeList=['EMA5TOPArc','MACDTopArc','EMADownCross']
-            totalList=['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc','EMA5TOPArc','MACDTopArc','EMADownCross']
+            totalList=['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc','MACDTopArc','EMADownCross']
 
-            if recogName in totalList:
+            if recogName in longTypeList:
                 self.AddFutuList(listname='SpecialFocus',list=codelistNew)
                 time.sleep(3)
 

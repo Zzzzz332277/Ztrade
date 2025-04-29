@@ -116,6 +116,8 @@ pass
 
 # 定义爬取函数
 def crawl_sina_finance_reports(pages=300):
+    print('爬取新浪财经数据')
+
     base_url = "https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/lastest/index.phtml"
     reports = []
     headers = {
@@ -131,6 +133,8 @@ def crawl_sina_finance_reports(pages=300):
             response.encoding = detected_encoding
         else:
             response.encoding = 'GB2312'  # 如果chardet无法检测到编码，则默认使用GB2312
+        print(f'爬取第{page}页')
+
         soup = BeautifulSoup(response.content)  # , 'html.parser'
 
         # 找到所有报道的列表项
@@ -148,6 +152,7 @@ def crawl_sina_finance_reports(pages=300):
 
 # 定义爬取函数
 def crawlInvestingFinanceReports(pages=50):
+    print('爬取英为才情数据')
     base_url = "https://investing.com/news/stock-market-news"
     reports = []
     headers = {
@@ -161,6 +166,7 @@ def crawlInvestingFinanceReports(pages=50):
         else:
             pageStr='/'+str(page)
 
+        print(f'爬取第{page}页')
         url = base_url+pageStr
 
         response=scraper.get(url) # => "<!DOCTYPE html><html><head>..."
@@ -305,6 +311,7 @@ def titleIndustAnalyze(dataframe):
     return filtered_word_counts_regex
 
 def titleCountUS(titles):
+    print("统计词频")
     #取最多的100个
     maxTitles=100
     #情绪词汇加载
@@ -335,6 +342,8 @@ def titleCountUS(titles):
     #if any(codeIsInList):
 
 def titleCountUSBySpacy(titles):
+    print("统计词频bySpacy")
+
     #取最多的100个
     maxTitles=100
     #情绪词汇加载
@@ -378,7 +387,7 @@ def titleCountUSBySpacy(titles):
     '''
 
 # 爬取数据
-#reports_data = crawl_sina_finance_reports()
+reports_data = crawl_sina_finance_reports()
 #crawlInvestingFinanceReports()
 #crawStockName()
 titles=crawlInvestingFinanceReports()
@@ -423,6 +432,7 @@ word_counts_updated = word_counts.most_common()
 filtered_word_counts_regex = [item for item in word_counts_updated if item[0] in codeList]
 '''
 # Generate word cloud
+print("绘制词频图")
 wordcloud = WordCloud(font_path='simhei.ttf', background_color='white',
                       max_words=100,  # Limits the number of words to 100
                       max_font_size=50)  # .generate(seg_text)    #文本可以直接生成，但是不好看
