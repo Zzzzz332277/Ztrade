@@ -57,11 +57,11 @@ class Zfutu():
     def __init__(self,market):
         self.market=market
         #ema diffusion先不做
-        self.recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','MACDBottomArc','MACDTopArc','EMADownCross']
+        self.recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA10BottomArc','EMA10TOPArc','MACDBottomArc','MACDTopArc','EMADownCross']
         if market=='HK':
             self.listNameList=['backstepemaHK', 'EmaDiffusionHK','EMAUpCrossHK', 'MoneyFlowHK', 'EMA5BottomArcHK','EMA5TOPArcHK','MACDTopArcHK','MACDBottomArcHK','EMADownCrossHK']
         elif market=='US':
-            self.listNameList= ['backstepemaUS', 'EmaDiffusionUS','EMAUpCrossUS', 'MoneyFlowUS', 'EMA5BottomArcUS','EMA5TOPArcUS','MACDBottomArcUS','MACDTopArcUS','EMADownCrossUS']
+            self.listNameList= ['backstepemaUS', 'EmaDiffusionUS','EMAUpCrossUS', 'MoneyFlowUS', 'EMA10BottomArcUS','EMA10TOPArcUS','MACDBottomArcUS','MACDTopArcUS','EMADownCrossUS']
         else:
             print('市场输入错误')
             return
@@ -89,15 +89,25 @@ class Zfutu():
             print('error:', everyDayWatchData)
         codeListEveryDayWatch = everyDayWatchData['code'].tolist()
 
+        ################同样保留IBKR股票#############
+        ret, IBKRList = quote_ctx.get_user_security('ibkr')
+        if ret == RET_OK:
+            pass
+            # print(data)  # 返回 success
+        else:
+            print('error:', IBKRList)
+        IBKRList = IBKRList['code'].tolist()
+
         ##################################################先讲原先的list清除########################
         #因为增加operation分类，需要单独将operation清除
         operationList=['operation']
         self.CleanOutFUTUList(operationList)
-        time.sleep(10)
+        #延长时间，防止操作频繁
+        time.sleep(60)
 
         self.CleanOutFUTUList(self.listNameList)
         print('等待30S，防止调用futu接口过于频繁')
-        time.sleep(30)
+        time.sleep(60)
 
         #将resulttable中的结果按识别内容分类，并清除为0的行
         for index,recogName in enumerate(self.recogList):
@@ -118,12 +128,15 @@ class Zfutu():
             shortTypeList=['EMA5TOPArc','MACDTopArc','EMADownCross']
             totalList=['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc','MACDTopArc','EMADownCross']
 
-            if recogName in longTypeList:
+            if recogName in totalList:
                 self.AddFutuList(listname='SpecialFocus',list=codelistNew)
                 time.sleep(3)
 
-        ###################################再恢复每日关注的股票#####################################
+        ###################################再恢复每日关注的股票以及IBKR股票#####################################
         self.AddFutuList(listname=watchList, list=codeListEveryDayWatch)
+        time.sleep(5)
+        self.AddFutuList(listname=watchList, list=IBKRList)
+
 
     #将wind的代码与富途进行转化
     def CodeTransferWind2FUTU(self,codelist):

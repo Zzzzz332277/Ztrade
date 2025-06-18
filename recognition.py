@@ -41,7 +41,7 @@ pass
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
-    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','MACDBottomArc','MACDTopArc','EMADownCross',]
+    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA10BottomArc','EMA10TOPArc','MACDBottomArc','MACDTopArc','EMADownCross',]
     def __init__(self):
         #必须声明为实例变量，放在外面就是类变量
         self.resultTable = pd.DataFrame(columns=self.recogProcList)
@@ -77,9 +77,9 @@ class Recognition:
                 #判断资金流入
                 dicBuff['MoneyFlow'] = self.MoneyFLowFutu(stockInProcess)
                 # 判断底部圆弧
-                dicBuff['EMA5BottomArc'] = self.EMA5BottomArc(stockInProcess)
+                dicBuff['EMA10BottomArc'] = self.EMA10BottomArc(stockInProcess)
                 #识别顶部圆弧
-                dicBuff['EMA5TOPArc'] = self.EMA5TOPArc(stockInProcess)
+                dicBuff['EMA10TOPArc'] = self.EMA10TOPArc(stockInProcess)
                 # 识别底部MACD弧
                 dicBuff['MACDBottomArc'] = self.MACDBottomArc(stockInProcess)
                 # 识别顶部MACD弧
@@ -465,6 +465,78 @@ class Recognition:
 
             print("不是弧形底")
             return 0
+
+    #EMA10弧形底 EMA均线的圆形底
+    def EMA10BottomArc(self, stock):
+        print('开始识别弧形底部')
+
+        # if stock.market=='HKEX':
+        # 流入资金100万的阈值,这里只针对HK股票
+        # if stock.totalCashFlowIn<1000000:
+        # return 0
+        # 加入一个资金流入的筛选判断
+        # if stock.superCashFlowIn < 0 or stock.bigCashFlowIn < 0:
+        # return 0
+
+        # 对于最后一条K线的判断
+        lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+        lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+        lastHigh = stock.dayPriceData['HIGH'].iloc[-1]
+        lastLow = stock.dayPriceData['LOW'].iloc[-1]
+
+        # 是阴线
+        if lastClose < lastOpen:
+            return 0
+        # 上下影线计算，到这步直接是阳线
+        upShadowLen = abs(lastHigh - lastClose)
+        downShadowLen = abs(lastLow - lastOpen)
+        candleLen = abs(lastOpen - lastClose)
+        # 上影线不能超过1/2长度
+        if upShadowLen > (candleLen / 2):
+            return 0
+        '''
+        # 倒数第二根是阴线，且最后一根阳线成交量未超过倒数第二根
+        if stock.dayPriceData['CLOSE'].iloc[-2] < stock.dayPriceData['OPEN'].iloc[-2] and stock.dayPriceData['VOLUME'].iloc[-1] < stock.dayPriceData['VOLUME'].iloc[-2]:
+            print('上涨成交量不足，不符合')
+            return 0
+        '''
+        type = '5'
+        if type != '3' and type != '5':
+            print('type 错误')
+            return 0
+
+        if type == '5':
+            # 5个值
+            data = stock.EMAData['EMA10']
+            arr = np.zeros(5)
+            for i in range(0, 5):
+                # 取最后5个
+                arr[i] = stock.EMAData['EMA10'].iloc[i - 5]
+            posMin = np.argmin(arr)
+            if posMin == 2:
+                if arr[1] < arr[0] and arr[3] < arr[4]:
+                    print("弧形底")
+                    return 1
+            if posMin == 3:
+                if arr[1] < arr[0] and arr[2] < arr[1]:
+                    print("弧形底")
+                    return 1
+            print("不是弧形底")
+            return 0
+
+        if type == '3':
+            # 3个值
+            data = stock.EMAData['EMA10']
+            arr = np.zeros(3)
+            for i in range(0, 3):
+                arr[i] = stock.EMAData['EMA10'].iloc[i - 3]
+            posMin = np.argmin(arr)
+            if posMin == 1:
+                print("弧形底")
+                return 1
+
+            print("不是弧形底")
+            return 0
 #################################################识别下降类的程序##################################################
     #识别弧形顶
     def EMA5TOPArc(self,stock):
@@ -517,6 +589,64 @@ class Recognition:
             arr=np.zeros(3)
             for i in range(0, 3):
                 arr[i] = stock.EMAData['EMA5'].iloc[i - 3]
+            posMax = np.argmax(arr)
+            if posMax == 1:
+                print("弧形顶")
+                return 1
+
+            print("不是弧形顶")
+            return 0
+
+    def EMA10TOPArc(self,stock):
+        print('开始识别弧形顶部')
+
+        # 对于最后一条K线的判断
+        lastClose = stock.dayPriceData['CLOSE'].iloc[-1]
+        lastOpen = stock.dayPriceData['OPEN'].iloc[-1]
+        lastHigh = stock.dayPriceData['HIGH'].iloc[-1]
+        lastLow = stock.dayPriceData['LOW'].iloc[-1]
+
+        # 是阳线
+        if lastClose > lastOpen:
+            return 0
+        # 上下影线计算，到这步直接是阴线
+        upShadowLen = abs(lastHigh - lastOpen)
+        downShadowLen = abs(lastLow - lastClose)
+        candleLen = abs(lastOpen - lastClose)
+        # 下影线不能超过1/2长度
+        if downShadowLen > (candleLen / 2):
+            return 0
+        # 这里先锁死5个值
+        type = '5'
+        if type != '3' and type != '5':
+            print('type 错误')
+            return 0
+
+        if type == '5':
+            # 5个值
+            data = stock.EMAData['EMA10']
+            arr = np.zeros(5)
+            for i in range(0, 5):
+                # 取最后5个
+                arr[i] = stock.EMAData['EMA10'].iloc[i - 5]
+            posMax = np.argmax(arr)
+            if posMax == 2:
+                if arr[1] > arr[0] and arr[3] > arr[4]:
+                    print("弧形顶")
+                    return 1
+            if posMax == 3:
+                if arr[1] > arr[0] and arr[2] > arr[1]:
+                    print("弧形顶")
+                    return 1
+            print("不是弧形顶")
+            return 0
+
+        if type == '3':
+            # 3个值
+            data = stock.EMAData['EMA10']
+            arr=np.zeros(3)
+            for i in range(0, 3):
+                arr[i] = stock.EMAData['EMA10'].iloc[i - 3]
             posMax = np.argmax(arr)
             if posMax == 1:
                 print("弧形顶")

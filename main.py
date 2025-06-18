@@ -147,7 +147,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.textBrowser.ensureCursorVisible()
 
     def UpdateTab(self,stocklist,recog_US):
-        recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross','MACDBottomArc','MACDTopArc']
+        recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA10BottomArc','EMA10TOPArc','EMADownCross','MACDBottomArc','MACDTopArc']
 
         resultTable=recog_US.resultTable
         for index,recogName in enumerate(recogList):
