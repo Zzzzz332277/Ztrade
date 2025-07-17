@@ -32,15 +32,15 @@ else:
 
 #用于转化单个code的函数
 def CodeTransWind2FUTU(code):
-    codebuff = code.split('.')
-    codeNew = codebuff[1] + '.' + '0' + codebuff[0]
+    #codebuff = code.split('.')
+    codeNew = 'HK' + '.' + '0' + code
     return codeNew
 
 def CodeTransWind2FUTU_US(codelist):
     codelistNew = list()
     for code in codelist:
-        codebuff = code.split('.')
-        codeNew = 'US' + '.' + codebuff[0]
+        #codebuff = code.split('.')
+        codeNew = 'US' + '.' + code[0]
         codelistNew.append(codeNew)
     return codelistNew
 

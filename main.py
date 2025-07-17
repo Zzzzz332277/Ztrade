@@ -95,7 +95,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         TradeCalendar_US = 'NYSE'
         codeDF = pd.read_csv("D:\ztrade\codesUS.csv", encoding="gb2312")
         #codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
-        codeList = codeDF['WindCodes'].tolist()
+        codeList = codeDF['Codes'].tolist()
         #codeList = ['AAPL.O']
         #美股三大指数
         indexCodesUS=['^NDX','^DJI','^SPX']
@@ -114,7 +114,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         #单独为指数准备的gwd类
         #gwdIndex = database.GetWindDaTA(database.conUS, database.engineUS, database.sessionUS, TradeCalendar_US)
         #gwdIndex.SyncDataBaseDayPirceDataYFinance(indexCodesUS, startDate, endDate,'daypricedata')
-        index_US=dtp_US.DataPreWindDB(indexCodesUS, startDate, endDate)
+        #index_US=dtp_US.DataPreWindDB(indexCodesUS, startDate, endDate)
         # 使用stock列表进行beta分析
         # result= index.BetaAnalyze(startDate,endDate,stocks_US)
         pass
@@ -124,7 +124,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         #stg_us.SignalProcess(stocks_US)
         stg_us.LoadExcel(stocks_US)
         stg_us.CalVol60(stocks_US)
-        stg_us.CalCorrelation60(stocks_US, index_US)
+        #stg_us.CalCorrelation60(stocks_US, index_US)
 
 
         recog_US = recognition.Recognition()
@@ -186,7 +186,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 continue
 
             #取最大的那个相关性,指数名称+数字
-            CorrelationUS=stock.CorrelationUS[0]+':'+str(format(stock.CorrelationUS[1],'.2f'))
+            #CorrelationUS=stock.CorrelationUS[0]+':'+str(format(stock.CorrelationUS[1],'.2f'))
             #增加的关于成功率的统计
             signalProbTable=stock.signalSucessProb
             #RSIOverBuy=signalProbTable['RSIOverBuy'].iloc[0]
@@ -209,7 +209,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             table.setItem(row_count - 1, 3, QtWidgets.QTableWidgetItem(changePctStr))
             table.setItem(row_count - 1, 4, QtWidgets.QTableWidgetItem(str(volume)))
             table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(vol60)))
-            table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(CorrelationUS))
+            #table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(CorrelationUS))
 
             #table.setItem(row_count - 1, 5, QtWidgets.QTableWidgetItem(str(RSIOverBuy)))
             #table.setItem(row_count - 1, 6, QtWidgets.QTableWidgetItem(str(RSIOverSell)))

@@ -18,6 +18,7 @@ from futu import *
 import futu as ft
 import zfutu
 import yfinance as yf
+import akshare as ak
 
 
 # 数据库的地址:HK市場
@@ -283,10 +284,21 @@ class GetWindDaTA:
         self.tradingCalendar=tradingcalendar
         self.dataSet = []
         self.dataSetUpdate = []
+        #这里读取一个文件，获取到arkshare的symbol
+        self.arkSymbolDF = pd.read_excel('symbolArkshare.xlsx')
+
         pass
 
     def GetCodeHK(self):
         pass
+
+    #将code转化为arksymbol
+    def TransCode2Ark(self,code):
+        pos=self.arkSymbolDF.index[self.arkSymbolDF['代码']==code][0]
+        codeArk=self.arkSymbolDF['ark代码'].iloc[pos]
+        return codeArk
+
+
     '''
     def GetDataHK(self):
         for i in range(0, len(codeHKtest) - 1):
@@ -308,7 +320,8 @@ class GetWindDaTA:
         if code in indexList:
             return self.UpdateTimePeriodDataSingleYFiance(code, startDate, endDate, tableName)
         else:
-            return self.UpdateTimePeriodDataSingleFutu(code, startDate, endDate, tableName)
+            #return self.UpdateTimePeriodDataSingleFutu(code, startDate, endDate, tableName)
+            return self.UpdateTimePeriodDataSingleArkshare(code, startDate, endDate, tableName)
 
 
     #获取给定单一code的数据，成功返回1，失败返回0
@@ -380,6 +393,52 @@ class GetWindDaTA:
         self.con.commit()
         #30秒内最多请求60次，睡眠0.5S
         time.sleep(0.5)
+
+        # 获取data的最后一个日期，作为codedateindex日期
+        lastDate=buffData['DATE'].iloc[-1]
+        firstDate=buffData['DATE'].iloc[0]
+        return 1,firstDate,lastDate
+
+    #通过arkshare接口获取日线数据
+    def UpdateTimePeriodDataSingleArkshare(self, code, startDate, endDate, tableName):
+        statrTimeStr = startDate.strftime("%Y%m%d")
+        endTimeStr = endDate.strftime("%Y%m%d")
+        #查询ark代码
+        codeArk=self.TransCode2Ark(code)
+        data=ak.stock_us_hist(symbol=codeArk, period="daily", start_date=statrTimeStr, end_date=endTimeStr, adjust="qfq")
+        if data.empty:
+            # 抛出无数据的异常
+            #raise myexception.ExceptionFutuNoData('Futu: No data.')
+            #未获取到数据也休眠，避免频繁调用接口
+            time.sleep(0.5)
+            return 0,0,0
+        buffData = pd.DataFrame()
+        timeStrSeries = data['日期']
+        timeDateList = []
+        #这里注意ark的日期格式和futu不同,没有时分秒
+        for timeStr in timeStrSeries:
+            timeDate = datetime.strptime(timeStr, '%Y-%m-%d')  # strptime()内参数必须为string格式
+            #timeDate = datetime.date(timeDatetime)
+            timeDateList.append(timeDate)
+
+        buffData['OPEN'] = data['开盘']
+        buffData['CLOSE'] = data['收盘']
+        buffData['HIGH'] = data['最高']
+        buffData['LOW'] = data['最低']
+        buffData['VOLUME'] = data['成交量']
+        buffData['DATE'] = timeDateList
+        buffData['CODE']=code
+
+        print(f"获取{code}的日线数据")
+
+        # 检查数据是否有nan，防止nan进入数据库
+        if self.CheckDataHasNan(buffData):
+            print('数据中含有nan，无法使用')
+            return 0
+        buffData.to_sql(name=tableName, con=self.engine, if_exists="append", index=False)
+        self.con.commit()
+        #30秒内最多请求60次，睡眠0.5S
+        time.sleep(0.1)
 
         # 获取data的最后一个日期，作为codedateindex日期
         lastDate=buffData['DATE'].iloc[-1]
