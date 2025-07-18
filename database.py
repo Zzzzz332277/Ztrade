@@ -438,7 +438,7 @@ class GetWindDaTA:
         buffData.to_sql(name=tableName, con=self.engine, if_exists="append", index=False)
         self.con.commit()
         #30秒内最多请求60次，睡眠0.5S
-        time.sleep(0.1)
+        #time.sleep(0.1)
 
         # 获取data的最后一个日期，作为codedateindex日期
         lastDate=buffData['DATE'].iloc[-1]

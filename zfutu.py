@@ -135,7 +135,7 @@ class Zfutu():
         ###################################再恢复每日关注的股票以及IBKR股票#####################################
         self.AddFutuList(listname=watchList, list=codeListEveryDayWatch)
         time.sleep(5)
-        self.AddFutuList(listname=watchList, list=IBKRList)
+        self.AddFutuList(listname='ibkr', list=IBKRList)
 
 
     #将wind的代码与富途进行转化
