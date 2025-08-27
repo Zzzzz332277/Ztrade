@@ -51,13 +51,13 @@ class Recognition:
         for stock in stocklist:
             stockInProcess = stock#取出对象值
             #加入成交额的判断
-            turnVolumeTresh=5000000 #500万
+            turnVolumeTresh=5 #500万
             lastClose=stockInProcess.dayPriceData['CLOSE'].iloc[-1]
             lastVolume=stockInProcess.dayPriceData['VOLUME'].iloc[-1]
             #加入波动率超过40的判断
             vol60 = stock.vol60
             # 只插入波动率比40大的
-            if float(vol60) < 0.4:
+            if float(vol60) < 0.1:
                 continue
 
             #成交量超过500万才进行判断

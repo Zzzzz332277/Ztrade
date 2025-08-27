@@ -45,6 +45,8 @@ class StockClass:
 
         #60日波动率
         self.vol60=0
+        #90日平滑度分数
+        self.smooth90=0
         # 和指数相关性
         self.CorrelationUS=[]
         '''

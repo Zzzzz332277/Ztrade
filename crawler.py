@@ -187,7 +187,8 @@ def GetYahooEarningsCalenderData(date):
     html=getHTMLText(url)
     soup = BeautifulSoup(html, 'html.parser')
     rows = soup.find_all('tr')
-    simbols=soup.find_all(name='a',attrs={'data-test':"quoteLink"})
+    #simbols=soup.find_all(name='a',attrs={'data-test':"quoteLink"})
+    simbols = soup.find_all(name='a', class_="loud-link fin-size-small ellipsis yf-1i440lo")
     nameList=list()
     for simbol in simbols:
         print(simbol.text)
@@ -195,9 +196,10 @@ def GetYahooEarningsCalenderData(date):
     nameList=pd.Series(nameList)
     nameList=nameList.drop_duplicates()
 
+    print(nameList)
     return nameList
 
 
-#date = date(2024, 4, 18)
-#GetYahooEarningsCalenderData(date)
+date = date(2025, 8, 26)
+GetYahooEarningsCalenderData(date)
 ##GetTushare()

@@ -99,6 +99,9 @@ def ZtradeUS():
     #result= index.BetaAnalyze(startDate,endDate,stocks_US)
 
     stg = strategy.Strategy()
+
+    #测试平滑度
+
     stg.SignalProcess(stocks_US)
     stg.WriteToExcel()
     pass

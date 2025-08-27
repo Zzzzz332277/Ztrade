@@ -1,3 +1,5 @@
+import csv
+
 import pandas as pd
 import numpy as np
 import talib
@@ -167,6 +169,177 @@ class Strategy():
             Volatility = np.std(logreturns) * np.sqrt(252)
             #保留两位小数
             stock.vol60='{:.2f}'.format(Volatility)
+
+
+    #参考deepseek给出的计算平滑性的函数
+    def calculate_kline_smoothness(self,stocklist):
+        """
+        计算K线形态平滑度评分
+        评估K线的连续性和一致性，避免大幅跳空和剧烈震荡
+
+        参数:
+        kline_data: DataFrame，包含OHLCV数据，需要有'open','high','low','close'列
+
+        返回:
+        smoothness_score: 平滑度评分(0-100分)
+        """
+        #测试用数据记录
+
+
+
+        for stock in stocklist:
+            dayPriceData = stock.dayPriceData
+            dayPriceData = dayPriceData.sort_values(by="DATE", ascending=True)
+            lenData = dayPriceData.shape[0]
+            if lenData < 90:
+                #raise ValueError("数据不足90日")
+                #不足90日跳过计算
+                continue
+
+            # 使用最近90日数据
+            data = dayPriceData.iloc[-90:].copy()
+            opens = data['OPEN'].values
+            highs = data['HIGH'].values
+            lows = data['LOW'].values
+            closes = data['CLOSE'].values
+
+            # 1. 计算开盘跳空幅度（与前一日收盘比较）
+            gap_up = opens[1:] - closes[:-1]  # 向上跳空
+            gap_down = closes[:-1] - opens[1:]  # 向下跳空
+            gap_ratio = np.abs(opens[1:] - closes[:-1]) / closes[:-1]
+            avg_gap_ratio = np.mean(gap_ratio) * 100  # 平均跳空百分比
+
+            # 2. 计算K线实体大小（衡量价格变动幅度）
+            body_size = np.abs(closes - opens) / opens  # 实体大小占开盘价比例
+            avg_body_size = np.mean(body_size) * 100  # 平均实体大小百分比
+
+            # 3. 计算上下影线比例（衡量价格震荡程度）
+            upper_shadow = np.where(closes > opens,
+                                    (highs - closes) / (highs - lows + 1e-10),
+                                    (highs - opens) / (highs - lows + 1e-10))
+            lower_shadow = np.where(closes > opens,
+                                    (opens - lows) / (highs - lows + 1e-10),
+                                    (closes - lows) / (highs - lows + 1e-10))
+            avg_upper_shadow = np.mean(upper_shadow) * 100  # 平均上影线比例
+            avg_lower_shadow = np.mean(lower_shadow) * 100  # 平均下影线比例
+
+            # 4. 计算趋势一致性（连续同向K线数量）
+            direction_changes = 0
+            for i in range(1, len(closes)):
+                # 判断趋势是否改变（考虑小幅波动）
+                prev_trend = 1 if closes[i - 1] > opens[i - 1] else (-1 if closes[i - 1] < opens[i - 1] else 0)
+                curr_trend = 1 if closes[i] > opens[i] else (-1 if closes[i] < opens[i] else 0)
+
+                if prev_trend != 0 and curr_trend != 0 and prev_trend != curr_trend:
+                    # 只有当趋势明确改变时才计数
+                    if abs(closes[i] - opens[i]) / opens[i] > 0.002:  # 忽略极小实体
+                        direction_changes += 1
+
+            trend_consistency = 100 * (1 - direction_changes / 89)  # 趋势一致性评分
+
+            # 5. 计算价格变化的连续性（相邻K线重叠程度）
+            overlap_scores = []
+            for i in range(1, len(opens)):
+                # 计算相邻K线的价格区间重叠程度
+                prev_min = min(opens[i - 1], closes[i - 1])
+                prev_max = max(opens[i - 1], closes[i - 1])
+                curr_min = min(opens[i], closes[i])
+                curr_max = max(opens[i], closes[i])
+
+                # 计算重叠部分占前一根K线的比例
+                overlap_min = max(prev_min, curr_min)
+                overlap_max = min(prev_max, curr_max)
+
+                if overlap_max > overlap_min:
+                    overlap_ratio = (overlap_max - overlap_min) / (prev_max - prev_min + 1e-10)
+                else:
+                    overlap_ratio = 0
+
+                overlap_scores.append(overlap_ratio)
+
+            avg_overlap = np.mean(overlap_scores) * 100  # 平均重叠比例
+
+            # 6. 计算日内振幅稳定性
+            daily_ranges = (highs - lows) / opens  # 日内振幅占开盘价比例
+            range_std = np.std(daily_ranges) * 100  # 振幅的标准差（稳定性指标）
+
+            # 归一化各项指标并计算总分
+            # 所有指标都转换为0-100分，越高越好
+
+            # 跳空幅度（越小越好 → 反向指标）
+            gap_score = 100 * max(0, 1 - min(avg_gap_ratio / 2, 1))  # 假设2%为最大可接受跳空
+
+            # 实体大小（适中最好，太小无方向，太大太剧烈）
+            if avg_body_size < 0.5:
+                body_score = 100 * (avg_body_size / 0.5)
+            elif avg_body_size > 2.0:
+                body_score = 100 * (1 - (avg_body_size - 2.0) / 3.0)
+            else:
+                body_score = 100
+
+            # 影线比例（越小越好 → 反向指标）
+            shadow_score = 100 * max(0, 1 - (avg_upper_shadow + avg_lower_shadow) / 100)
+
+            # 趋势一致性（越高越好）
+            trend_score = trend_consistency
+
+            # 重叠程度（越高越好）
+            overlap_score = avg_overlap
+
+            # 振幅稳定性（标准差越小越好 → 反向指标）
+            range_stability = 100 * max(0, 1 - min(range_std / 1.0, 1))  # 假设1%为标准差阈值
+
+            # 加权平均计算总分
+            weights = {
+                'gap': 0.25,  # 跳空幅度
+                'body': 0.15,  # 实体大小
+                'shadow': 0.15,  # 影线比例
+                'trend': 0.2,  # 趋势一致性
+                'overlap': 0.15,  # 重叠程度
+                'stability': 0.1  # 振幅稳定性
+            }
+
+            smoothness_score = (
+                    weights['gap'] * gap_score +
+                    weights['body'] * body_score +
+                    weights['shadow'] * shadow_score +
+                    weights['trend'] * trend_score +
+                    weights['overlap'] * overlap_score +
+                    weights['stability'] * range_stability
+            )
+
+            # 确保分数在0-100之间
+            smoothness_score = max(0, min(100, smoothness_score))
+
+            # 返回详细评分信息（可选）
+            detail_scores = {
+                'total_score': round(smoothness_score, 2),
+                'gap_score': round(gap_score, 2),
+                'body_score': round(body_score, 2),
+                'shadow_score': round(shadow_score, 2),
+                'trend_score': round(trend_score, 2),
+                'overlap_score': round(overlap_score, 2),
+                'stability_score': round(range_stability, 2)
+            }
+
+            stock.smooth90=smoothness_score
+            new_row = [stock.code,stock.smooth90]
+            file_path = 'testSmooth.csv'
+            try:
+                # 打开文件并以追加模式写入
+                with open(file_path, mode="a", newline="", encoding="utf-8") as file:
+                    writer = csv.writer(file)
+                    writer.writerow(new_row)
+                    # 写入新的一行
+            except FileNotFoundError:
+                print(f"错误：文件 {file_path} 不存在！")
+            except Exception as e:
+                print(f"发生错误：{e}")
+
+
+            print(f"成功向文件 {file_path} 添加一行数据：{new_row}")
+            #return detail_scores
+
 
     #计算和指数的相关性：
 

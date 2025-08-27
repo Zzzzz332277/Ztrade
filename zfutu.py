@@ -127,9 +127,17 @@ class Zfutu():
             #只做空
             shortTypeList=['EMA5TOPArc','MACDTopArc','EMADownCross']
             totalList=['backstepema', 'EmaDiffusion','EMAUpCross','EMA5BottomArc','MACDBottomArc','MACDTopArc','EMADownCross']
-
+            '''
             if recogName in totalList:
                 self.AddFutuList(listname='SpecialFocus',list=codelistNew)
+                time.sleep(3)
+            '''
+            #将多空分开添加名单
+            if recogName in longTypeList:
+                self.AddFutuList(listname='SpecialLong',list=codelistNew)
+                time.sleep(3)
+            if recogName in shortTypeList:
+                self.AddFutuList(listname='SpecialShort',list=codelistNew)
                 time.sleep(3)
 
         ###################################再恢复每日关注的股票以及IBKR股票#####################################
@@ -142,11 +150,11 @@ class Zfutu():
     def CodeTransferWind2FUTU(self,codelist):
         codelistNew = list()
         for code in codelist:
-            codebuff=code.split('.')
+            #codebuff=code.split('.')
             if self.market == 'HK':
-                codeNew=codebuff[1]+'.'+'0'+codebuff[0]
+                codeNew='HK'+'.'+'0'+code
             elif self.market == 'US':
-                codeNew = 'US'+'.'+codebuff[0]
+                codeNew = 'US'+'.'+code
             codelistNew.append(codeNew)
         return codelistNew
 

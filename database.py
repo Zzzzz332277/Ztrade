@@ -1124,6 +1124,7 @@ class GetWindDaTA:
         oneDay = timedelta(days=1)
         # 需要将单个的code转化为codelist，满足update函数的运行条件
         for code in codeList:
+            print(code)
             codeResult = self.session.query(CodeDateIndex).filter(CodeDateIndex.CODE == code).all()
             if len(codeResult) == 0:
                 print(f'表中无该{code}数据,开始获取新数据')

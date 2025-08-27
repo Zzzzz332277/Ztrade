@@ -55,6 +55,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         #############################
         self.pushButton.clicked.connect(self.ZtradeUS)
+        #self.pushButton.clicked.connect(self.ZtradeUSAutoTest)
         #显示K线的逻辑
         #self.showCandle.clicked.connect(self.ShowCandle)
         #传递table值进去
@@ -93,7 +94,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def ZtradeUS(self):
         # f= open(, encoding="utf-8")
         TradeCalendar_US = 'NYSE'
-        codeDF = pd.read_csv("D:\ztrade\codesUS.csv", encoding="gb2312")
+        codeDF = pd.read_csv("codesUS.csv", encoding="gb2312")
         #codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
         codeList = codeDF['Codes'].tolist()
         #codeList = ['AAPL.O']
@@ -101,7 +102,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         indexCodesUS=['^NDX','^DJI','^SPX']
         #indexCodesUS=['^SPX']
 
-        startDate = date(2024, 1, 3)
+        startDate = date(2025, 1, 3)
         #endDate = date(2024, 3,15)
         endDate = date.today() - timedelta(days=1)
 
@@ -122,6 +123,54 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # 先计算波动率，去除掉波动率较低的股票
         stg_us = strategy.Strategy()
         #stg_us.SignalProcess(stocks_US)
+        stg_us.LoadExcel(stocks_US)
+        stg_us.CalVol60(stocks_US)
+        #stg_us.CalCorrelation60(stocks_US, index_US)
+
+
+        recog_US = recognition.Recognition()
+        recog_US.RecognitionProcess(stocks_US)
+
+
+        zft_US = zfutu.Zfutu(market='US')
+        zft_US.ModifyFutuStockList(recog_US.resultTable)
+
+        self.UpdateTab(stocks_US,recog_US)
+
+    def ZtradeUSAutoTest(self):
+        # f= open(, encoding="utf-8")
+        TradeCalendar_US = 'NYSE'
+        codeDF = pd.read_csv("codesUS.csv", encoding="gb2312")
+        #codeDF=pd.read_csv("D:\ztrade\codesShort.csv")
+        codeList = codeDF['Codes'].tolist()
+        #codeList = ['AAPL.O']
+        #美股三大指数
+        indexCodesUS=['^NDX','^DJI','^SPX']
+        #indexCodesUS=['^SPX']
+
+        startDate = date(2025, 1, 3)
+        #endDate = date(2024, 3,15)
+        endDate = date.today() - timedelta(days=1)
+
+        # codeList=['AES.N']
+
+        pass
+        dtp_US = database.DataPrepare(database.conUS, database.engineUS, database.sessionUS, TradeCalendar_US)
+        # 准备好待处理的stock类
+        stocks_US = dtp_US.DataPreWindDB(codeList, startDate, endDate)
+        #单独为指数准备的gwd类
+        #gwdIndex = database.GetWindDaTA(database.conUS, database.engineUS, database.sessionUS, TradeCalendar_US)
+        #gwdIndex.SyncDataBaseDayPirceDataYFinance(indexCodesUS, startDate, endDate,'daypricedata')
+        #index_US=dtp_US.DataPreWindDB(indexCodesUS, startDate, endDate)
+        # 使用stock列表进行beta分析
+        # result= index.BetaAnalyze(startDate,endDate,stocks_US)
+        pass
+        # 识别的类
+        # 先计算波动率，去除掉波动率较低的股票
+        stg_us = strategy.Strategy()
+        #stg_us.SignalProcess(stocks_US)
+        stg_us.calculate_kline_smoothness(stocks_US)
+        pass
         stg_us.LoadExcel(stocks_US)
         stg_us.CalVol60(stocks_US)
         #stg_us.CalCorrelation60(stocks_US, index_US)
