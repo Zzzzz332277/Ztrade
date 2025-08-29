@@ -41,7 +41,7 @@ pass
 
 # 这里设置判断的类，将形态判断的相关函数放在里面
 class Recognition:
-    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA10BottomArc','EMA10TOPArc','MACDBottomArc','MACDTopArc','EMADownCross',]
+    recogProcList= ['code', 'backstepema', 'EmaDiffusion', 'EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','MACDBottomArc','MACDTopArc','EMADownCross',]
     def __init__(self):
         #必须声明为实例变量，放在外面就是类变量
         self.resultTable = pd.DataFrame(columns=self.recogProcList)
@@ -77,9 +77,13 @@ class Recognition:
                 #判断资金流入
                 dicBuff['MoneyFlow'] = self.MoneyFLowFutu(stockInProcess)
                 # 判断底部圆弧
-                dicBuff['EMA10BottomArc'] = self.EMA10BottomArc(stockInProcess)
+                #dicBuff['EMA10BottomArc'] = self.EMA10BottomArc(stockInProcess)
+                # 判断底部圆弧ema5
+                dicBuff['EMA5BottomArc'] = self.EMA5BottomArc(stockInProcess)
                 #识别顶部圆弧
-                dicBuff['EMA10TOPArc'] = self.EMA10TOPArc(stockInProcess)
+                #dicBuff['EMA10TOPArc'] = self.EMA10TOPArc(stockInProcess)
+                # 识别顶部圆弧
+                dicBuff['EMA5TOPArc'] = self.EMA5TOPArc(stockInProcess)
                 # 识别底部MACD弧
                 dicBuff['MACDBottomArc'] = self.MACDBottomArc(stockInProcess)
                 # 识别顶部MACD弧

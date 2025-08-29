@@ -55,7 +55,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         #############################
         self.pushButton.clicked.connect(self.ZtradeUS)
-        #self.pushButton.clicked.connect(self.ZtradeUSAutoTest)
         #显示K线的逻辑
         #self.showCandle.clicked.connect(self.ShowCandle)
         #传递table值进去
@@ -196,7 +195,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.textBrowser.ensureCursorVisible()
 
     def UpdateTab(self,stocklist,recog_US):
-        recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA10BottomArc','EMA10TOPArc','EMADownCross','MACDBottomArc','MACDTopArc']
+        recogList = ['backstepema', 'EmaDiffusion','EMAUpCross','MoneyFlow','EMA5BottomArc','EMA5TOPArc','EMADownCross','MACDBottomArc','MACDTopArc']
 
         resultTable=recog_US.resultTable
         for index,recogName in enumerate(recogList):
